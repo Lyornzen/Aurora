@@ -72,6 +72,7 @@ class ApiService {
     double topP = 0.9,
     int maxTokens = 4096,
     bool enableThinking = false,
+    String reasoningEffort = 'high',
   }) async* {
     final url = _buildUrl('/chat/completions');
     final body = <String, dynamic>{
@@ -88,6 +89,10 @@ class ApiService {
       body['thinking'] = {
         'type': enableThinking ? 'enabled' : 'disabled',
       };
+      // reasoning_effort only valid when thinking is enabled
+      if (enableThinking) {
+        body['reasoning_effort'] = reasoningEffort;
+      }
       body['response_format'] = {'type': 'text'};
     }
 

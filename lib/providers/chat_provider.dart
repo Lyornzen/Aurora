@@ -39,6 +39,22 @@ class ChatProvider extends ChangeNotifier {
   int get totalMessageCount =>
       _messages.values.fold(0, (sum, msgs) => sum + msgs.length);
 
+  Map<String, int> get tokenUsageByModel {
+    final map = <String, int>{};
+    for (final msgs in _messages.values) {
+      for (final m in msgs) {
+        if (m.modelName != null && m.modelName!.isNotEmpty) {
+          final tokens = (m.content.length * 0.5).round();
+          map[m.modelName!] = (map[m.modelName!] ?? 0) + tokens;
+        }
+      }
+    }
+    return map;
+  }
+
+  int get totalTokens =>
+      tokenUsageByModel.values.fold(0, (sum, v) => sum + v);
+
   /// Load all data from SQLite
   Future<void> load() async {
     if (_loaded) return;
@@ -89,6 +105,8 @@ class ChatProvider extends ChangeNotifier {
     String content, {
     String? modelName,
     ApiProviderConfig? apiConfig,
+    bool enableThinking = true,
+    String reasoningEffort = 'high',
   }) async {
     if (_currentSessionId == null) {
       createNewSession();
@@ -143,6 +161,8 @@ class ChatProvider extends ChangeNotifier {
       final stream = apiService.chatCompletionStream(
         messages: msgsForApi,
         model: model,
+        enableThinking: enableThinking,
+        reasoningEffort: reasoningEffort,
       );
 
       final buffer = StringBuffer();
