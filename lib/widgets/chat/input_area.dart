@@ -13,6 +13,8 @@ class InputArea extends StatefulWidget {
   final ValueChanged<bool>? onThinkingToggle;
   final ValueChanged<bool>? onVisionToggle;
   final ValueChanged<bool>? onFileAnalysisToggle;
+  final VoidCallback? onReasoningPick;
+  final String reasoningEffort;
   final bool autoFocus;
 
   const InputArea({
@@ -28,6 +30,8 @@ class InputArea extends StatefulWidget {
     this.onThinkingToggle,
     this.onVisionToggle,
     this.onFileAnalysisToggle,
+    this.onReasoningPick,
+    this.reasoningEffort = 'high',
     this.autoFocus = false,
   });
 
@@ -45,6 +49,10 @@ class InputAreaState extends State<InputArea> {
   late stt.SpeechToText _speech;
   bool _isListening = false;
   bool _speechAvailable = false;
+
+  String get _thinkingLabel => widget.isThinkingEnabled
+      ? (widget.reasoningEffort == 'max' ? '深度思考 🔥' : '深度思考')
+      : '深度思考';
 
   @override
   void initState() {
@@ -141,17 +149,19 @@ class InputAreaState extends State<InputArea> {
                 child: Row(
                   children: [
                     _QuickChip(
+                      icon: Icons.psychology_outlined,
+                      label: _thinkingLabel,
+                      selected: widget.isThinkingEnabled,
+                      onSelected: (v) => widget.onThinkingToggle?.call(v),
+                      onLongPress:
+                          widget.isThinkingEnabled ? widget.onReasoningPick : null,
+                    ),
+                    const SizedBox(width: 4),
+                    _QuickChip(
                       icon: Icons.search,
                       label: '联网搜索',
                       selected: widget.isWebSearchEnabled,
                       onSelected: (v) => widget.onWebSearchToggle?.call(v),
-                    ),
-                    const SizedBox(width: 4),
-                    _QuickChip(
-                      icon: Icons.psychology_outlined,
-                      label: '深度思考',
-                      selected: widget.isThinkingEnabled,
-                      onSelected: (v) => widget.onThinkingToggle?.call(v),
                     ),
                     const SizedBox(width: 4),
                     _QuickChip(
@@ -254,21 +264,25 @@ class _QuickChip extends StatelessWidget {
   final String label;
   final bool selected;
   final ValueChanged<bool>? onSelected;
+  final VoidCallback? onLongPress;
 
   const _QuickChip({
     required this.icon,
     required this.label,
     required this.selected,
     this.onSelected,
+    this.onLongPress,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return FilterChip.elevated(
-      selected: selected,
-      onSelected: onSelected,
+    return GestureDetector(
+      onLongPress: onLongPress,
+      child: FilterChip.elevated(
+        selected: selected,
+        onSelected: onSelected,
       avatar: Icon(icon, size: 16),
       label: Text(label),
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -277,6 +291,7 @@ class _QuickChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       selectedColor: theme.colorScheme.secondaryContainer,
+      ),
     );
   }
 }

@@ -24,6 +24,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _thinking = false;
   bool _vision = false;
   bool _fileAnalysis = false;
+  bool _maxReasoning = false; // only used when thinking is on
 
   String _currentModel = '';
 
@@ -71,6 +72,8 @@ class _ChatScreenState extends State<ChatScreen> {
           text,
           modelName: _currentModel,
           apiConfig: apiConfig,
+          enableThinking: _thinking,
+          reasoningEffort: _maxReasoning ? 'max' : 'high',
         );
     _inputKey.currentState?.unfocus();
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
@@ -151,6 +154,16 @@ class _ChatScreenState extends State<ChatScreen> {
             const SizedBox(height: 12),
           ],
         ),
+      ),
+    );
+  }
+
+  void _toggleMaxReasoning() {
+    setState(() => _maxReasoning = !_maxReasoning);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(_maxReasoning ? '已切换为 Max 推理强度' : '已恢复默认推理强度 (High)'),
+        duration: const Duration(seconds: 1),
       ),
     );
   }
@@ -336,10 +349,12 @@ class _ChatScreenState extends State<ChatScreen> {
           isThinkingEnabled: _thinking,
           isVisionEnabled: _vision,
           isFileAnalysisEnabled: _fileAnalysis,
+          reasoningEffort: _maxReasoning ? 'max' : 'high',
           onWebSearchToggle: (v) => setState(() => _webSearch = v),
           onThinkingToggle: (v) => setState(() => _thinking = v),
           onVisionToggle: (v) => setState(() => _vision = v),
           onFileAnalysisToggle: (v) => setState(() => _fileAnalysis = v),
+          onReasoningPick: _thinking ? _toggleMaxReasoning : null,
           onAttach: _attachFile,
         ),
       ],
