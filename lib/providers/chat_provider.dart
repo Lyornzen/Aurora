@@ -20,7 +20,8 @@ class ChatProvider extends ChangeNotifier {
   // Stream controller for live updates during streaming
   StreamSubscription? _streamSubscription;
 
-  List<ChatSession> get sessions => _sessions;
+  List<ChatSession> get sessions =>
+      _sessions.where((s) => s.messageCount > 0).toList();
   String? get currentSessionId => _currentSessionId;
   bool get hasCurrentSession => _currentSessionId != null;
 
@@ -43,11 +44,16 @@ class ChatProvider extends ChangeNotifier {
     if (_loaded) return;
     try {
       final sessions = await DatabaseService.loadSessions();
-      _sessions.addAll(sessions);
 
       for (final session in sessions) {
         final msgs = await DatabaseService.loadMessages(session.id);
-        _messages[session.id] = msgs;
+        if (msgs.isEmpty) {
+          // Clean up empty sessions from DB
+          await DatabaseService.deleteSession(session.id);
+        } else {
+          _messages[session.id] = msgs;
+          _sessions.add(session.copyWith(messageCount: msgs.length));
+        }
       }
 
       if (_sessions.isNotEmpty) {
@@ -65,7 +71,7 @@ class ChatProvider extends ChangeNotifier {
     _sessions.insert(0, session);
     _messages[session.id] = [];
     _currentSessionId = session.id;
-    DatabaseService.saveSession(session);
+    // Don't save to DB until first message
     notifyListeners();
   }
 

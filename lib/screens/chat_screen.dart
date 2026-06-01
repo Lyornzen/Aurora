@@ -19,12 +19,32 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final _scrollController = ScrollController();
+  final _inputKey = GlobalKey<InputAreaState>();
   bool _webSearch = false;
   bool _thinking = false;
   bool _vision = false;
   bool _fileAnalysis = false;
 
-  String _currentModel = '未选择模型';
+  String _currentModel = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDefaultModel();
+  }
+
+  void _loadDefaultModel() {
+    final api = context.read<ApiProvider>();
+    final def = api.modelSettings.defaultChatModel;
+    if (def.isNotEmpty) {
+      _currentModel = def;
+    } else {
+      // Fallback: first model from first enabled provider
+      _currentModel = api.enabledProviders
+          .expand((p) => p.models)
+          .firstOrNull ?? '未选择模型';
+    }
+  }
 
   @override
   void dispose() {
@@ -52,6 +72,7 @@ class _ChatScreenState extends State<ChatScreen> {
           modelName: _currentModel,
           apiConfig: apiConfig,
         );
+    _inputKey.currentState?.unfocus();
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
@@ -218,45 +239,43 @@ class _ChatScreenState extends State<ChatScreen> {
               ],
             ),
           ),
-        // Model selector bar (compact)
-        if (hasMessages)
+        // Model selector bar — show whenever a session exists
+        if (chatProvider.hasCurrentSession)
           GestureDetector(
             onTap: _showModelPicker,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Material(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(20),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 6),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.auto_awesome,
-                            size: 16,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _currentModel,
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.expand_more,
-                            size: 16,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                        ],
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+              child: Material(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.auto_awesome,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
-                    ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _currentModel,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Icon(
+                        Icons.expand_more,
+                        size: 18,
+                        color:
+                            Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -297,16 +316,21 @@ class _ChatScreenState extends State<ChatScreen> {
                     );
                   },
                 )
-              : const EmptyState(
+              : EmptyState(
                   icon: Icons.chat_bubble_outline,
                   title: '开始对话',
                   description: '与 AI 助手开始你的第一场对话',
                   actionLabel: '新建会话',
+                  onAction: () {
+                    context.read<ChatProvider>().createNewSession();
+                    _inputKey.currentState?.focusInput();
+                  },
                 ),
         ),
 
         // Input area
         InputArea(
+          key: _inputKey,
           onSend: _handleSend,
           isWebSearchEnabled: _webSearch,
           isThinkingEnabled: _thinking,
