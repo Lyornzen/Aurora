@@ -13,6 +13,7 @@ class InputArea extends StatefulWidget {
   final ValueChanged<bool>? onThinkingToggle;
   final ValueChanged<bool>? onVisionToggle;
   final ValueChanged<bool>? onFileAnalysisToggle;
+  final bool autoFocus;
 
   const InputArea({
     super.key,
@@ -27,13 +28,18 @@ class InputArea extends StatefulWidget {
     this.onThinkingToggle,
     this.onVisionToggle,
     this.onFileAnalysisToggle,
+    this.autoFocus = false,
   });
 
+  void focusInput() {
+    // Accessed via GlobalKey<InputAreaState>
+  }
+
   @override
-  State<InputArea> createState() => _InputAreaState();
+  State<InputArea> createState() => InputAreaState();
 }
 
-class _InputAreaState extends State<InputArea> {
+class InputAreaState extends State<InputArea> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
   late stt.SpeechToText _speech;
@@ -45,6 +51,17 @@ class _InputAreaState extends State<InputArea> {
     super.initState();
     _speech = stt.SpeechToText();
     _initSpeech();
+    if (widget.autoFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _focusNode.requestFocus());
+    }
+  }
+
+  void focusInput() {
+    _focusNode.requestFocus();
+  }
+
+  void unfocus() {
+    _focusNode.unfocus();
   }
 
   void _initSpeech() async {
@@ -113,14 +130,14 @@ class _InputAreaState extends State<InputArea> {
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+          padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               // Quick action chips
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 child: Row(
                   children: [
                     _QuickChip(
@@ -129,21 +146,21 @@ class _InputAreaState extends State<InputArea> {
                       selected: widget.isWebSearchEnabled,
                       onSelected: (v) => widget.onWebSearchToggle?.call(v),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 4),
                     _QuickChip(
                       icon: Icons.psychology_outlined,
                       label: '深度思考',
                       selected: widget.isThinkingEnabled,
                       onSelected: (v) => widget.onThinkingToggle?.call(v),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 4),
                     _QuickChip(
                       icon: Icons.image_outlined,
                       label: '图片识别',
                       selected: widget.isVisionEnabled,
                       onSelected: (v) => widget.onVisionToggle?.call(v),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 4),
                     _QuickChip(
                       icon: Icons.description_outlined,
                       label: '文件分析',
@@ -153,11 +170,11 @@ class _InputAreaState extends State<InputArea> {
                   ],
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
 
               // Input row
               Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   IconButton(
                     icon: const Icon(Icons.attach_file_outlined),
@@ -167,8 +184,8 @@ class _InputAreaState extends State<InputArea> {
                   Expanded(
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
-                        maxHeight: 180,
-                        minHeight: 56,
+                        maxHeight: 160,
+                        minHeight: 44,
                       ),
                       child: TextField(
                         controller: _controller,
@@ -179,15 +196,16 @@ class _InputAreaState extends State<InputArea> {
                         onSubmitted: (_) => _send(),
                         decoration: InputDecoration(
                           hintText: '输入消息...',
+                          isDense: true,
                           filled: true,
                           fillColor: theme.colorScheme.surfaceContainerHighest,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(24),
+                            borderRadius: BorderRadius.circular(22),
                             borderSide: BorderSide.none,
                           ),
                           contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 14,
+                            horizontal: 16,
+                            vertical: 10,
                           ),
                         ),
                       ),

@@ -267,10 +267,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildFontSizeTile(BuildContext context) {
+    final themeProvider = context.watch<ThemeProvider>();
     return ListTile(
       leading: const Icon(Icons.format_size),
       title: const Text('字体大小'),
-      subtitle: const Text('标准'),
+      subtitle: Text(ThemeProvider.fontSizeLabels[themeProvider.fontSizeIndex]),
       trailing: const Icon(Icons.chevron_right),
       onTap: () => _showFontSizePicker(context),
     );
@@ -376,6 +377,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showFontSizePicker(BuildContext context) {
+    final themeProvider = context.read<ThemeProvider>();
     showModalBottomSheet(
       context: context,
       builder: (ctx) => SafeArea(
@@ -384,25 +386,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _bottomSheetHeader('字体大小'),
-            const ListTile(
-              leading: Icon(Icons.format_size),
-              title: Text('小'),
-              selected: false,
-            ),
-            ListTile(
-              leading: const Icon(Icons.format_size),
-              title: const Text('标准'),
-              selected: true,
-              trailing: const Icon(Icons.check, color: Colors.green),
-            ),
-            const ListTile(
-              leading: Icon(Icons.format_size),
-              title: Text('大'),
-            ),
-            const ListTile(
-              leading: Icon(Icons.format_size),
-              title: Text('超大'),
-            ),
+            ...List.generate(ThemeProvider.fontSizeLabels.length, (i) {
+              final isSelected = themeProvider.fontSizeIndex == i;
+              return ListTile(
+                leading: Icon(Icons.format_size,
+                    size: 18.0 + i * 4.0),
+                title: Text(ThemeProvider.fontSizeLabels[i]),
+                selected: isSelected,
+                trailing: isSelected
+                    ? const Icon(Icons.check, color: Colors.green)
+                    : null,
+                onTap: () {
+                  themeProvider.setFontSize(i);
+                  Navigator.pop(ctx);
+                },
+              );
+            }),
             const SizedBox(height: 12),
           ],
         ),
@@ -417,78 +416,148 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showModelDefaults(BuildContext context) {
+    final apiProvider = context.read<ApiProvider>();
+    final settings = apiProvider.modelSettings;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('默认模型设置',
-                  style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 20),
-              _buildDefaultModelRow('默认聊天模型', '未设置'),
-              const Divider(),
-              _buildDefaultModelRow('默认视觉模型', '未设置'),
-              const Divider(),
-              _buildDefaultModelRow('默认推理模型', '未设置'),
-              const SizedBox(height: 20),
-              const Text('高级参数'),
-              const SizedBox(height: 12),
-              _buildSliderRow('Context 长度', 4096, 1024, 32768),
-              _buildSliderRow('Temperature', 0.7, 0.0, 2.0),
-              _buildSliderRow('Top P', 0.9, 0.0, 1.0),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('保存'),
-                ),
+      builder: (ctx) {
+        // Local copies for editing
+        String chatModel = settings.defaultChatModel;
+        String? visionModel = settings.defaultVisionModel;
+        String? reasonModel = settings.defaultReasoningModel;
+        double temperature = settings.temperature;
+        double topP = settings.topP;
+        int contextLen = settings.contextLength;
+
+        return StatefulBuilder(
+          builder: (ctx2, setLocalState) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('默认模型设置',
+                      style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 20),
+
+                  // Collect all models from enabled providers
+                  _buildModelDropdown(ctx2, '默认聊天模型', chatModel,
+                      (v) => setLocalState(() => chatModel = v)),
+                  const Divider(),
+                  _buildModelDropdown(ctx2, '默认视觉模型',
+                      visionModel ?? '未设置',
+                      (v) => setLocalState(() => visionModel = v)),
+                  const Divider(),
+                  _buildModelDropdown(ctx2, '默认推理模型',
+                      reasonModel ?? '未设置',
+                      (v) => setLocalState(() => reasonModel = v)),
+                  const SizedBox(height: 20),
+                  const Text('高级参数'),
+                  const SizedBox(height: 12),
+                  _buildSlider('Context 长度', contextLen.toDouble(),
+                      1024, 32768, (v) => setLocalState(() => contextLen = v.round())),
+                  _buildSlider('Temperature', temperature, 0.0, 2.0,
+                      (v) => setLocalState(() => temperature = v)),
+                  _buildSlider('Top P', topP, 0.0, 1.0,
+                      (v) => setLocalState(() => topP = v)),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () {
+                        final newSettings = ModelSettings(
+                          defaultChatModel: chatModel,
+                          defaultVisionModel:
+                              visionModel == '未设置' ? null : visionModel,
+                          defaultReasoningModel:
+                              reasonModel == '未设置' ? null : reasonModel,
+                          contextLength: contextLen,
+                          temperature: temperature,
+                          topP: topP,
+                        );
+                        apiProvider.saveModelSettings(newSettings);
+                        Navigator.pop(ctx);
+                      },
+                      child: const Text('保存'),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
               ),
-              const SizedBox(height: 16),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildDefaultModelRow(String label, String value) {
+  Widget _buildModelDropdown(
+      BuildContext ctx, String label, String current, ValueChanged<String> onChanged) {
+    final apiProvider = context.read<ApiProvider>();
+    final allModels = <String>['未设置'];
+    for (final p in apiProvider.enabledProviders) {
+      allModels.addAll(p.models);
+    }
+
     return ListTile(
       title: Text(label),
-      subtitle: Text(value),
+      subtitle: Text(current),
       trailing: const Icon(Icons.chevron_right),
-      onTap: () {},
+      onTap: () {
+        showModalBottomSheet(
+          context: ctx,
+          builder: (innerCtx) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Text('选择模型',
+                      style: Theme.of(context).textTheme.titleLarge),
+                ),
+                ...allModels.map((m) => ListTile(
+                      title: Text(m),
+                      selected: current == m,
+                      trailing: current == m
+                          ? const Icon(Icons.check, color: Colors.green)
+                          : null,
+                      onTap: () {
+                        onChanged(m);
+                        Navigator.pop(innerCtx);
+                      },
+                    )),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildSliderRow(
-      String label, double value, double min, double max) {
-    return StatefulBuilder(
-      builder: (context, setLocalState) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(label),
-                Text(value.toStringAsFixed(1)),
-              ],
-            ),
-            Slider(
-              value: value,
-              min: min,
-              max: max,
-              onChanged: (v) => setLocalState(() {}),
-            ),
-          ],
-        ),
+  Widget _buildSlider(String label, double value, double min, double max,
+      ValueChanged<double> onChanged) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label),
+              Text(value.toStringAsFixed(1)),
+            ],
+          ),
+          Slider(
+            value: value,
+            min: min,
+            max: max,
+            onChanged: onChanged,
+          ),
+        ],
       ),
     );
   }
@@ -679,6 +748,7 @@ class _ApiProviderEditorState extends State<_ApiProviderEditor> {
   late TextEditingController _keyCtrl;
   late TextEditingController _urlCtrl;
   late TextEditingController _modelsCtrl;
+  bool _obscureKey = true;
 
   @override
   void initState() {
@@ -689,6 +759,32 @@ class _ApiProviderEditorState extends State<_ApiProviderEditor> {
     _urlCtrl = TextEditingController(text: widget.config.baseUrl);
     _modelsCtrl = TextEditingController(
         text: widget.config.models.join(', '));
+  }
+
+  void _showResultDialog(
+    BuildContext ctx, {
+    required bool success,
+    required String title,
+    required String message,
+  }) {
+    showDialog(
+      context: ctx,
+      builder: (dialogCtx) => AlertDialog(
+        icon: Icon(
+          success ? Icons.check_circle : Icons.error,
+          size: 48,
+          color: success ? Colors.green : Colors.red,
+        ),
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -747,11 +843,14 @@ class _ApiProviderEditorState extends State<_ApiProviderEditor> {
                 decoration: InputDecoration(
                   labelText: 'API Key',
                   suffixIcon: IconButton(
-                    icon: const Icon(Icons.visibility_outlined),
-                    onPressed: () {},
+                    icon: Icon(_obscureKey
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined),
+                    onPressed: () =>
+                        setState(() => _obscureKey = !_obscureKey),
                   ),
                 ),
-                obscureText: true,
+                obscureText: _obscureKey,
               ),
               const SizedBox(height: 16),
 
@@ -804,33 +903,39 @@ class _ApiProviderEditorState extends State<_ApiProviderEditor> {
                   );
                   final service = ApiService(config: tempConfig);
                   final result = await service.testConnection();
-                  service.dispose();
 
                   if (context.mounted) Navigator.of(context).pop();
 
-                  if (context.mounted) {
-                    if (result.success) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            '连接成功！延迟: ${result.latencyMs}ms${result.modelCount > 0 ? ', 模型数: ${result.modelCount}' : ''}${result.note ?? ''}',
-                          ),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                      // Auto-fill models from API
-                      if (result.modelCount > 0 && _modelsCtrl.text.isEmpty) {
-                        // Models would be filled here if we had the names
-                      }
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('连接失败: ${result.error ?? "未知错误"}'),
-                          backgroundColor: Colors.red,
-                        ),
+                  if (context.mounted && result.success) {
+                    // Auto-fetch model names from API
+                    final modelNames = await service.fetchModels();
+
+                    if (modelNames.isNotEmpty && mounted) {
+                      setState(() {
+                        _modelsCtrl.text = modelNames.join(', ');
+                      });
+                    }
+
+                    if (context.mounted) {
+                      _showResultDialog(
+                        context,
+                        success: true,
+                        title: '连接成功',
+                        message: '延迟: ${result.latencyMs}ms\n'
+                            '获取到 ${modelNames.length} 个模型\n'
+                            '${modelNames.isNotEmpty ? modelNames.take(5).join('\n') : ''}'
+                            '${modelNames.length > 5 ? '\n...等 ${modelNames.length} 个' : ''}',
                       );
                     }
+                  } else if (context.mounted && !result.success) {
+                    _showResultDialog(
+                      context,
+                      success: false,
+                      title: '连接失败',
+                      message: result.error ?? '未知错误',
+                    );
                   }
+                  service.dispose();
                 },
                 icon: const Icon(Icons.wifi_find),
                 label: const Text('测试连接'),
