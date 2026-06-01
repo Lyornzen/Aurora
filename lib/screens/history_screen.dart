@@ -240,11 +240,37 @@ class _SessionTile extends StatelessWidget {
       direction: DismissDirection.horizontal,
       confirmDismiss: (direction) async {
         if (direction == DismissDirection.startToEnd) {
-          onPin();
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('置顶会话'),
+              content: Text('确定要${session.isPinned ? '取消置顶' : '置顶'}"${session.title}"吗？'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确定')),
+              ],
+            ),
+          );
+          if (confirmed == true) onPin();
           return false;
         } else {
-          onDelete();
-          return true;
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('删除会话'),
+              content: Text('确定要删除"${session.title}"吗？\n此操作不可撤销。'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
+                  child: const Text('删除'),
+                ),
+              ],
+            ),
+          );
+          if (confirmed == true) onDelete();
+          return false;
         }
       },
       background: Container(

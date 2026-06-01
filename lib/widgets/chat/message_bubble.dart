@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:markdown/markdown.dart' as md;
 import '../../models/chat_message.dart';
 
 class MessageBubble extends StatelessWidget {
@@ -30,28 +31,16 @@ class MessageBubble extends StatelessWidget {
     final isUser = message.role == MessageRole.user;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
       child: Row(
         mainAxisAlignment:
             isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (!isUser) ...[
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: theme.colorScheme.primaryContainer,
-              child: Icon(
-                Icons.auto_awesome,
-                size: 16,
-                color: theme.colorScheme.onPrimaryContainer,
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
           Flexible(
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.78,
+                maxWidth: MediaQuery.of(context).size.width * 0.88,
               ),
               child: Column(
                 crossAxisAlignment:
@@ -72,37 +61,61 @@ class MessageBubble extends StatelessWidget {
                     color: isUser
                         ? theme.colorScheme.primaryContainer
                         : theme.colorScheme.surfaceContainerHighest,
+                    margin: EdgeInsets.zero,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(16),
-                        topRight: const Radius.circular(16),
-                        bottomLeft: Radius.circular(isUser ? 16 : 4),
-                        bottomRight: Radius.circular(isUser ? 4 : 16),
+                        topLeft: const Radius.circular(14),
+                        topRight: const Radius.circular(14),
+                        bottomLeft: Radius.circular(isUser ? 14 : 4),
+                        bottomRight: Radius.circular(isUser ? 4 : 14),
                       ),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
+                          horizontal: 12, vertical: 8),
                       child: isUser
                           ? Text(
                               message.content,
-                              style: theme.textTheme.bodyLarge?.copyWith(
+                              style: theme.textTheme.bodyMedium?.copyWith(
                                 color: theme.colorScheme.onPrimaryContainer,
+                                height: 1.4,
                               ),
                             )
                           : MarkdownBody(
                               data: message.content,
                               selectable: true,
+                              inlineSyntaxes: [
+                                _LatexInlineSyntax(),
+                              ],
                               styleSheet: MarkdownStyleSheet(
-                                p: theme.textTheme.bodyLarge,
-                                code: theme.textTheme.bodyMedium!.copyWith(
+                                p: theme.textTheme.bodyMedium!.copyWith(
+                                  height: 1.4,
+                                ),
+                                h1: theme.textTheme.bodyMedium!.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  height: 1.3,
+                                ),
+                                h2: theme.textTheme.bodyMedium!.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  height: 1.3,
+                                ),
+                                code: theme.textTheme.bodySmall!.copyWith(
                                   fontFamily: 'monospace',
+                                  fontSize: 12,
                                   backgroundColor:
                                       theme.colorScheme.surfaceContainerHighest,
                                 ),
                                 codeblockDecoration: BoxDecoration(
                                   color: theme.colorScheme.surfaceContainer,
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                blockquoteDecoration: BoxDecoration(
+                                  border: Border(
+                                    left: BorderSide(
+                                      color: theme.colorScheme.primary,
+                                      width: 3,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -111,7 +124,7 @@ class MessageBubble extends StatelessWidget {
 
                   // Time & model
                   Padding(
-                    padding: const EdgeInsets.only(top: 4, left: 8, right: 8),
+                    padding: const EdgeInsets.only(top: 2, left: 8, right: 8),
                     child: Text(
                       _formatTime(message.createdAt) +
                           (message.modelName != null
@@ -119,6 +132,7 @@ class MessageBubble extends StatelessWidget {
                               : ''),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
+                        fontSize: 11,
                       ),
                     ),
                   ),
@@ -129,18 +143,6 @@ class MessageBubble extends StatelessWidget {
               ),
             ),
           ),
-          if (isUser) ...[
-            const SizedBox(width: 8),
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: theme.colorScheme.secondaryContainer,
-              child: Icon(
-                Icons.person,
-                size: 16,
-                color: theme.colorScheme.onSecondaryContainer,
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -148,7 +150,7 @@ class MessageBubble extends StatelessWidget {
 
   Widget _buildToolbar(BuildContext context, ThemeData theme) {
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.only(top: 4),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -191,7 +193,9 @@ class MessageBubble extends StatelessWidget {
 
   String _formatTime(DateTime time) {
     final now = DateTime.now();
-    if (time.day == now.day && time.month == now.month && time.year == now.year) {
+    if (time.day == now.day &&
+        time.month == now.month &&
+        time.year == now.year) {
       return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
     }
     return '${time.month}/${time.day} ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
@@ -212,19 +216,19 @@ class _ToolbarButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 1),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           onTap: onTap,
           child: Tooltip(
             message: tooltip,
             child: Padding(
-              padding: const EdgeInsets.all(6),
+              padding: const EdgeInsets.all(4),
               child: Icon(
                 icon,
-                size: 16,
+                size: 14,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
@@ -232,6 +236,20 @@ class _ToolbarButton extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Custom inline syntax for LaTeX math ($...$) in Markdown
+class _LatexInlineSyntax extends md.InlineSyntax {
+  _LatexInlineSyntax() : super(r'\$([^$]+)\$');
+
+  @override
+  bool onMatch(md.InlineParser parser, Match match) {
+    final tex = match.group(1)!;
+    final element = md.Element.text('el', ' $tex ');
+    element.attributes['class'] = 'latex';
+    parser.addNode(element);
+    return true;
   }
 }
 
@@ -256,13 +274,13 @@ class _ThinkingSection extends StatelessWidget {
       elevation: 0,
       color: theme.colorScheme.tertiaryContainer.withAlpha(80),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         onTap: onToggle,
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -270,13 +288,13 @@ class _ThinkingSection extends StatelessWidget {
                 children: [
                   Icon(
                     Icons.psychology_outlined,
-                    size: 18,
+                    size: 16,
                     color: theme.colorScheme.onTertiaryContainer,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Text(
                     'Thinking...',
-                    style: theme.textTheme.bodyMedium?.copyWith(
+                    style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onTertiaryContainer,
                       fontWeight: FontWeight.w500,
                     ),
@@ -288,29 +306,27 @@ class _ThinkingSection extends StatelessWidget {
                       color: theme.colorScheme.onTertiaryContainer,
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 2),
                   Icon(
-                    isExpanded
-                        ? Icons.expand_less
-                        : Icons.expand_more,
-                    size: 18,
+                    isExpanded ? Icons.expand_less : Icons.expand_more,
+                    size: 16,
                     color: theme.colorScheme.onTertiaryContainer,
                   ),
                 ],
               ),
               if (isExpanded) ...[
-                const Divider(height: 16),
+                const Divider(height: 12),
                 ...steps.map((step) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.only(bottom: 6),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Icon(
                             Icons.check_circle_outline,
-                            size: 14,
+                            size: 12,
                             color: theme.colorScheme.onTertiaryContainer,
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,

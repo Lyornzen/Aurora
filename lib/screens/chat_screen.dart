@@ -24,7 +24,9 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _thinking = false;
   bool _vision = false;
   bool _fileAnalysis = false;
-  bool _maxReasoning = false; // only used when thinking is on
+  bool _maxReasoning = false;
+  bool _showJumpButton = false;
+  bool _isNearBottom = true;
 
   String _currentModel = '';
 
@@ -32,6 +34,34 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _loadDefaultModel();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    final nearBottom = pos.pixels >= pos.maxScrollExtent - 100;
+    if (nearBottom != _isNearBottom) {
+      setState(() => _isNearBottom = nearBottom);
+    }
+    // Show jump button only during streaming when user scrolls up
+    final chat = context.read<ChatProvider>();
+    if (chat.isStreaming && !nearBottom) {
+      if (!_showJumpButton) setState(() => _showJumpButton = true);
+    } else if (_showJumpButton && !chat.isStreaming) {
+      setState(() => _showJumpButton = false);
+    }
+  }
+
+  void _jumpToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    }
+    setState(() => _showJumpButton = false);
   }
 
   void _loadDefaultModel() {
@@ -54,10 +84,11 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _scrollToBottom() {
-    if (_scrollController.hasClients) {
+    // Only auto-scroll if user hasn't manually scrolled up
+    if (_scrollController.hasClients && _isNearBottom) {
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
       );
     }
@@ -214,6 +245,12 @@ class _ChatScreenState extends State<ChatScreen> {
     final hasMessages = messages.isNotEmpty;
     final theme = Theme.of(context);
 
+    // Auto-scroll during streaming if user is near bottom
+    if (chatProvider.isStreaming && _isNearBottom) {
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _scrollToBottom());
+    }
+
     return Column(
       children: [
         // Streaming indicator
@@ -296,7 +333,9 @@ class _ChatScreenState extends State<ChatScreen> {
         // Messages or empty state
         Expanded(
           child: hasMessages
-              ? ListView.builder(
+              ? Stack(
+                  children: [
+                    ListView.builder(
                   controller: _scrollController,
                   padding:
                       const EdgeInsets.symmetric(vertical: 8),
@@ -328,7 +367,23 @@ class _ChatScreenState extends State<ChatScreen> {
                       },
                     );
                   },
-                )
+                ),
+                // Jump-to-bottom FAB
+                if (_showJumpButton)
+                  Positioned(
+                    bottom: 8,
+                    right: 8,
+                    child: FloatingActionButton.small(
+                      heroTag: 'jumpBottom',
+                      onPressed: _jumpToBottom,
+                      backgroundColor:
+                          theme.colorScheme.primaryContainer,
+                      child: Icon(Icons.keyboard_arrow_down,
+                          color: theme.colorScheme.onPrimaryContainer),
+                    ),
+                  ),
+              ],
+            )
               : EmptyState(
                   icon: Icons.chat_bubble_outline,
                   title: '开始对话',

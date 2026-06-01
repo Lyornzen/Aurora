@@ -176,7 +176,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ListTile(
                 leading: const Icon(Icons.auto_awesome),
                 title: const Text('OpenSeek'),
-                subtitle: const Text('Version 1.0.0'),
+                subtitle: const Text('Version 1.1.2'),
               ),
               const Divider(height: 1, indent: 56),
               ListTile(
