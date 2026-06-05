@@ -1,297 +1,73 @@
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import '../../theme/app_theme.dart';
 
 class InputArea extends StatefulWidget {
   final Function(String) onSend;
   final VoidCallback? onAttach;
-  final VoidCallback? onVoice;
-  final bool isWebSearchEnabled;
   final bool isThinkingEnabled;
-  final bool isVisionEnabled;
-  final bool isFileAnalysisEnabled;
-  final ValueChanged<bool>? onWebSearchToggle;
-  final ValueChanged<bool>? onThinkingToggle;
-  final ValueChanged<bool>? onVisionToggle;
-  final ValueChanged<bool>? onFileAnalysisToggle;
-  final VoidCallback? onReasoningPick;
   final String reasoningEffort;
-  final bool autoFocus;
+  final ValueChanged<bool>? onThinkingToggle;
+  final VoidCallback? onReasoningPick;
 
-  const InputArea({
-    super.key,
-    required this.onSend,
-    this.onAttach,
-    this.onVoice,
-    this.isWebSearchEnabled = false,
-    this.isThinkingEnabled = false,
-    this.isVisionEnabled = false,
-    this.isFileAnalysisEnabled = false,
-    this.onWebSearchToggle,
-    this.onThinkingToggle,
-    this.onVisionToggle,
-    this.onFileAnalysisToggle,
-    this.onReasoningPick,
-    this.reasoningEffort = 'high',
-    this.autoFocus = false,
-  });
-
-  void focusInput() {
-    // Accessed via GlobalKey<InputAreaState>
-  }
+  const InputArea({super.key, required this.onSend, this.onAttach, this.isThinkingEnabled = false,
+    this.reasoningEffort = 'high', this.onThinkingToggle, this.onReasoningPick});
 
   @override
   State<InputArea> createState() => InputAreaState();
 }
 
 class InputAreaState extends State<InputArea> {
-  final _controller = TextEditingController();
-  final _focusNode = FocusNode();
+  final _ctrl = TextEditingController();
+  final _focus = FocusNode();
   late stt.SpeechToText _speech;
-  bool _isListening = false;
-  bool _speechAvailable = false;
-
-  String get _thinkingLabel => widget.isThinkingEnabled
-      ? (widget.reasoningEffort == 'max' ? '深度思考 🔥' : '深度思考')
-      : '深度思考';
+  bool _listening = false, _speechOK = false;
 
   @override
   void initState() {
     super.initState();
     _speech = stt.SpeechToText();
-    _initSpeech();
-    if (widget.autoFocus) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _focusNode.requestFocus());
-    }
+    _speech.initialize(onStatus: (s) { if (s == 'done' || s == 'notListening') { if (mounted) setState(() => _listening = false); } }).then((ok) { if (mounted) setState(() => _speechOK = ok); });
   }
 
-  void focusInput() {
-    _focusNode.requestFocus();
+  void _toggleMic() async {
+    if (_listening) { _speech.stop(); setState(() => _listening = false); return; }
+    setState(() => _listening = true);
+    await _speech.listen(onResult: (r) { if (mounted) { setState(() { _ctrl.text = r.recognizedWords; _ctrl.selection = TextSelection.fromPosition(TextPosition(offset: _ctrl.text.length)); }); } }, localeId: 'zh_CN');
   }
 
-  void unfocus() {
-    _focusNode.unfocus();
-  }
+  void _send() { final t = _ctrl.text.trim(); if (t.isNotEmpty) { widget.onSend(t); _ctrl.clear(); } }
 
-  void _initSpeech() async {
-    final available = await _speech.initialize(
-      onStatus: (status) {
-        if (status == 'done' || status == 'notListening') {
-          if (mounted) setState(() => _isListening = false);
-        }
-      },
-    );
-    if (mounted) setState(() => _speechAvailable = available);
-  }
-
-  void _toggleListening() async {
-    if (_isListening) {
-      _speech.stop();
-      setState(() => _isListening = false);
-      return;
-    }
-
-    setState(() => _isListening = true);
-    await _speech.listen(
-      onResult: (result) {
-        if (mounted) {
-          setState(() {
-            _controller.text = result.recognizedWords;
-            _controller.selection = TextSelection.fromPosition(
-              TextPosition(offset: _controller.text.length),
-            );
-          });
-        }
-      },
-      localeId: 'zh_CN',
-    );
-  }
+  void focusInput() => _focus.requestFocus();
+  void unfocus() => _focus.unfocus();
 
   @override
-  void dispose() {
-    _speech.stop();
-    _controller.dispose();
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  void _send() {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
-    widget.onSend(text);
-    _controller.clear();
-  }
+  void dispose() { _speech.stop(); _ctrl.dispose(); _focus.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: theme.shadowColor.withAlpha(20),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Quick action chips
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                child: Row(
-                  children: [
-                    _QuickChip(
-                      icon: Icons.psychology_outlined,
-                      label: _thinkingLabel,
-                      selected: widget.isThinkingEnabled,
-                      onSelected: (v) => widget.onThinkingToggle?.call(v),
-                      onLongPress:
-                          widget.isThinkingEnabled ? widget.onReasoningPick : null,
-                    ),
-                    const SizedBox(width: 4),
-                    _QuickChip(
-                      icon: Icons.search,
-                      label: '联网搜索',
-                      selected: widget.isWebSearchEnabled,
-                      onSelected: (v) => widget.onWebSearchToggle?.call(v),
-                    ),
-                    const SizedBox(width: 4),
-                    _QuickChip(
-                      icon: Icons.image_outlined,
-                      label: '图片识别',
-                      selected: widget.isVisionEnabled,
-                      onSelected: (v) => widget.onVisionToggle?.call(v),
-                    ),
-                    const SizedBox(width: 4),
-                    _QuickChip(
-                      icon: Icons.description_outlined,
-                      label: '文件分析',
-                      selected: widget.isFileAnalysisEnabled,
-                      onSelected: (v) => widget.onFileAnalysisToggle?.call(v),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              // Input row
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.attach_file_outlined),
-                    onPressed: widget.onAttach,
-                    tooltip: '附件',
-                  ),
-                  Expanded(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxHeight: 160,
-                        minHeight: 44,
-                      ),
-                      child: TextField(
-                        controller: _controller,
-                        focusNode: _focusNode,
-                        maxLines: null,
-                        minLines: 1,
-                        textInputAction: TextInputAction.newline,
-                        onSubmitted: (_) => _send(),
-                        decoration: InputDecoration(
-                          hintText: '输入消息...',
-                          isDense: true,
-                          filled: true,
-                          fillColor: theme.colorScheme.surfaceContainerHighest,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(22),
-                            borderSide: BorderSide.none,
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    icon: Icon(_isListening
-                        ? Icons.mic
-                        : Icons.mic_outlined),
-                    color: _isListening ? Colors.red : null,
-                    onPressed: _speechAvailable ? _toggleListening : null,
-                    tooltip: _speechAvailable
-                        ? (_isListening ? '停止录音' : '语音输入')
-                        : '语音输入不可用',
-                  ),
-                  const SizedBox(width: 2),
-                  Material(
-                    color: theme.colorScheme.primary,
-                    borderRadius: BorderRadius.circular(20),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(20),
-                      onTap: _send,
-                      child: Padding(
-                        padding: const EdgeInsets.all(10),
-                        child: Icon(
-                          Icons.send_rounded,
-                          color: theme.colorScheme.onPrimary,
-                          size: 22,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _QuickChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final ValueChanged<bool>? onSelected;
-  final VoidCallback? onLongPress;
-
-  const _QuickChip({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    this.onSelected,
-    this.onLongPress,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return GestureDetector(
-      onLongPress: onLongPress,
-      child: FilterChip.elevated(
-        selected: selected,
-        onSelected: onSelected,
-      avatar: Icon(icon, size: 16),
-      label: Text(label),
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      visualDensity: VisualDensity.compact,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      selectedColor: theme.colorScheme.secondaryContainer,
-      ),
+      decoration: BoxDecoration(color: theme.colorScheme.surface, boxShadow: [BoxShadow(color: theme.shadowColor.withAlpha(15), blurRadius: 8, offset: const Offset(0, -2))]),
+      child: SafeArea(child: Padding(padding: const EdgeInsets.fromLTRB(8, 8, 8, 8), child: Column(mainAxisSize: MainAxisSize.min, children: [
+        // Input row
+        Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          IconButton(icon: const Icon(Icons.attach_file, size: 22), onPressed: widget.onAttach, visualDensity: VisualDensity.compact),
+          Expanded(child: TextField(controller: _ctrl, focusNode: _focus, maxLines: null, minLines: 1,
+            textInputAction: TextInputAction.newline, onSubmitted: (_) => _send(),
+            decoration: InputDecoration(hintText: '输入消息...', isDense: true, filled: true,
+              fillColor: theme.colorScheme.surfaceContainerHighest,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(AuroraRadius.input), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10)))),
+          const SizedBox(width: 4),
+          IconButton(icon: Icon(_listening ? Icons.mic : Icons.mic_none, size: 22, color: _listening ? Colors.red : null), onPressed: _speechOK ? _toggleMic : null, visualDensity: VisualDensity.compact),
+          IconButton(icon: const Icon(Icons.image, size: 22), onPressed: widget.onAttach, visualDensity: VisualDensity.compact),
+          const SizedBox(width: 4),
+          Material(color: theme.colorScheme.primary, shape: const CircleBorder(),
+            child: InkWell(customBorder: const CircleBorder(), onTap: _send,
+              child: Padding(padding: const EdgeInsets.all(10), child: Icon(Icons.send_rounded, color: theme.colorScheme.onPrimary, size: 20)))),
+        ]),
+      ]))),
     );
   }
 }

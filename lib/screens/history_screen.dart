@@ -3,379 +3,102 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/chat_provider.dart';
 import '../models/chat_session.dart';
-import '../widgets/common/empty_state.dart';
+import '../theme/app_theme.dart';
 
 class HistoryScreen extends StatefulWidget {
-  final VoidCallback? onSwitchToChat;
-
-  const HistoryScreen({super.key, this.onSwitchToChat});
-
+  final ValueChanged<int>? onSwitchTab;
+  const HistoryScreen({super.key, this.onSwitchTab});
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  String _searchQuery = '';
-  final _searchController = TextEditingController();
-  String _filter = 'all'; // 'all', 'favorites', 'archived'
+  String _query = '';
+  final _ctrl = TextEditingController();
 
-  List<ChatSession> _filterSessions(List<ChatSession> sessions) {
-    var filtered = sessions;
-
-    // Filter by type
-    if (_filter == 'favorites') {
-      filtered = filtered.where((s) => s.isPinned).toList();
-    } else if (_filter == 'archived') {
-      filtered = filtered.where((s) => s.isArchived).toList();
-    }
-
-    // Filter by search
-    if (_searchQuery.isNotEmpty) {
-      filtered = filtered
-          .where((s) =>
-              s.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-              (s.modelName?.toLowerCase().contains(_searchQuery.toLowerCase()) ??
-                  false))
-          .toList();
-    }
-
-    return filtered;
-  }
-
-  Map<String, List<ChatSession>> _groupByDate(List<ChatSession> sessions) {
+  Map<String, List<ChatSession>> _group(List<ChatSession> sessions) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final yesterday = today.subtract(const Duration(days: 1));
-    final lastWeek = today.subtract(const Duration(days: 7));
-    final last30 = today.subtract(const Duration(days: 30));
-
-    final Map<String, List<ChatSession>> groups = {
-      'Today': [],
-      'Yesterday': [],
-      'Last 7 Days': [],
-      'Last 30 Days': [],
-      'Earlier': [],
-    };
-
-    for (final session in sessions) {
-      final date = DateTime(
-        session.updatedAt.year,
-        session.updatedAt.month,
-        session.updatedAt.day,
-      );
-
-      if (date == today) {
-        groups['Today']!.add(session);
-      } else if (date == yesterday) {
-        groups['Yesterday']!.add(session);
-      } else if (date.isAfter(lastWeek)) {
-        groups['Last 7 Days']!.add(session);
-      } else if (date.isAfter(last30)) {
-        groups['Last 30 Days']!.add(session);
-      } else {
-        groups['Earlier']!.add(session);
-      }
+    final week = today.subtract(const Duration(days: 7));
+    final Map<String, List<ChatSession>> g = {'Today': [], 'Yesterday': [], 'This Week': [], 'Earlier': []};
+    for (final s in sessions) {
+      final d = DateTime(s.updatedAt.year, s.updatedAt.month, s.updatedAt.day);
+      if (d == today) g['Today']!.add(s);
+      else if (d == yesterday) g['Yesterday']!.add(s);
+      else if (d.isAfter(week)) g['This Week']!.add(s);
+      else g['Earlier']!.add(s);
     }
-
-    groups.removeWhere((_, v) => v.isEmpty);
-    return groups;
+    g.removeWhere((_, v) => v.isEmpty);
+    return g;
   }
 
   @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
+  void dispose() { _ctrl.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
-    final chatProvider = context.watch<ChatProvider>();
+    final chat = context.watch<ChatProvider>();
     final theme = Theme.of(context);
+    final sessions = _query.isEmpty ? chat.sessions : chat.sessions.where((s) => s.title.toLowerCase().contains(_query.toLowerCase()) || (s.modelName?.toLowerCase().contains(_query.toLowerCase()) ?? false)).toList();
+    final grouped = _group(sessions);
 
-    final sessions = chatProvider.sessions;
-    if (sessions.isEmpty) {
-      return const EmptyState(
-        icon: Icons.history,
-        title: '无聊天记录',
-        description: '开始第一场对话吧',
-        actionLabel: '开始对话',
-      );
-    }
-
-    final filtered = _filterSessions(sessions);
-    final grouped = _groupByDate(filtered);
-
-    return Column(
-      children: [
-        // Search bar
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (v) => setState(() => _searchQuery = v),
-                  decoration: InputDecoration(
-                    hintText: '搜索对话、模型...',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() => _searchQuery = '');
-                            },
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: theme.colorScheme.surfaceContainerHighest,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.filter_list),
-                onSelected: (v) => setState(() => _filter = v),
-                itemBuilder: (_) => [
-                  const PopupMenuItem(
-                    value: 'all',
-                    child: Text('全部'),
-                  ),
-                  const PopupMenuItem(
-                    value: 'favorites',
-                    child: Text('已收藏'),
-                  ),
-                  const PopupMenuItem(
-                    value: 'archived',
-                    child: Text('已归档'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-
-        // Session list
-        Expanded(
-          child: filtered.isEmpty
-              ? EmptyState(
-                  icon: Icons.search_off,
-                  title: '未找到匹配结果',
-                  description: '尝试其他关键词',
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  itemCount: grouped.entries.length,
-                  itemBuilder: (context, groupIndex) {
-                    final entry = grouped.entries.elementAt(groupIndex);
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-                          child: Text(
-                            entry.key,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        ...entry.value.map((session) => _SessionTile(
-                              session: session,
-                              onTap: () {
-                                chatProvider.selectSession(session.id);
-                                widget.onSwitchToChat?.call();
-                              },
-                              onDelete: () =>
-                                  chatProvider.deleteSession(session.id),
-                              onArchive: () =>
-                                  chatProvider.archiveSession(session.id),
-                              onPin: () =>
-                                  chatProvider.togglePinSession(session.id),
-                            )),
-                      ],
-                    );
-                  },
-                ),
-        ),
-      ],
+    return Scaffold(
+      appBar: AppBar(title: const Text('History')),
+      body: Column(children: [
+        Padding(padding: const EdgeInsets.all(12), child: TextField(
+          controller: _ctrl, onChanged: (v) => setState(() => _query = v),
+          decoration: InputDecoration(hintText: 'Search conversations...', prefixIcon: const Icon(Icons.search),
+            suffixIcon: _query.isNotEmpty ? IconButton(icon: const Icon(Icons.clear), onPressed: () { _ctrl.clear(); setState(() => _query = ''); }) : null),
+        )),
+        Expanded(child: sessions.isEmpty
+            ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.history, size: 48, color: theme.colorScheme.onSurfaceVariant.withAlpha(80)), const SizedBox(height: 12), Text('No history', style: theme.textTheme.bodyLarge)]))
+            : ListView.builder(padding: const EdgeInsets.symmetric(horizontal: 16), itemCount: grouped.entries.length,
+                itemBuilder: (ctx, gi) {
+                  final e = grouped.entries.elementAt(gi);
+                  return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Padding(padding: const EdgeInsets.fromLTRB(4, 16, 4, 8), child: Text(e.key, style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.primary))),
+                    ...e.value.map((s) => _sessionTile(theme, s, chat)),
+                  ]);
+                })),
+      ]),
     );
   }
-}
 
-class _SessionTile extends StatelessWidget {
-  final ChatSession session;
-  final VoidCallback onTap;
-  final VoidCallback onDelete;
-  final VoidCallback onArchive;
-  final VoidCallback onPin;
-
-  const _SessionTile({
-    required this.session,
-    required this.onTap,
-    required this.onDelete,
-    required this.onArchive,
-    required this.onPin,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final timeFormat = DateFormat('HH:mm');
-    final dateFormat = DateFormat('MM/dd');
-
-    final timeStr = session.updatedAt.day == DateTime.now().day
-        ? timeFormat.format(session.updatedAt)
-        : dateFormat.format(session.updatedAt);
-
-    return Dismissible(
-      key: Key('session_${session.id}'),
-      direction: DismissDirection.horizontal,
-      confirmDismiss: (direction) async {
-        if (direction == DismissDirection.startToEnd) {
-          final confirmed = await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('置顶会话'),
-              content: Text('确定要${session.isPinned ? '取消置顶' : '置顶'}"${session.title}"吗？'),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确定')),
-              ],
-            ),
-          );
-          if (confirmed == true) onPin();
+  Widget _sessionTile(ThemeData theme, ChatSession s, ChatProvider chat) {
+    final fmt = DateFormat('HH:mm');
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Dismissible(
+        key: Key(s.id), direction: DismissDirection.horizontal,
+        confirmDismiss: (dir) async {
+          if (dir == DismissDirection.startToEnd) {
+            final ok = await showDialog<bool>(context: context, builder: (c) => AlertDialog(
+              title: const Text('Pin'), content: Text('${s.isPinned ? 'Unpin' : 'Pin'} "${s.title}"?'),
+              actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('OK'))],
+            ));
+            if (ok == true) chat.togglePinSession(s.id);
+          } else {
+            final ok = await showDialog<bool>(context: context, builder: (c) => AlertDialog(
+              title: const Text('Delete'), content: Text('Delete "${s.title}"?'),
+              actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(c, true), style: FilledButton.styleFrom(backgroundColor: AuroraColors.error), child: const Text('Delete'))],
+            ));
+            if (ok == true) chat.deleteSession(s.id);
+          }
           return false;
-        } else {
-          final confirmed = await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('删除会话'),
-              content: Text('确定要删除"${session.title}"吗？\n此操作不可撤销。'),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-                FilledButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
-                  child: const Text('删除'),
-                ),
-              ],
-            ),
-          );
-          if (confirmed == true) onDelete();
-          return false;
-        }
-      },
-      background: Container(
-        alignment: Alignment.centerLeft,
-        padding: const EdgeInsets.only(left: 20),
-        color: theme.colorScheme.tertiary,
-        child: Icon(Icons.push_pin, color: theme.colorScheme.onTertiary),
-      ),
-      secondaryBackground: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        color: theme.colorScheme.error,
-        child: Icon(Icons.delete, color: theme.colorScheme.onError),
-      ),
-      child: Card(
-        elevation: 0,
-        color: theme.colorScheme.surfaceContainerLow,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          if (session.isPinned)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 4),
-                              child: Icon(
-                                Icons.push_pin,
-                                size: 14,
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                          Expanded(
-                            child: Text(
-                              session.title,
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                fontWeight: FontWeight.w500,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          if (session.modelName != null) ...[
-                            Icon(
-                              Icons.auto_awesome,
-                              size: 14,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              session.modelName!,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                          ],
-                          Icon(
-                            Icons.chat_bubble_outline,
-                            size: 14,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${session.messageCount}',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  timeStr,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.chevron_right,
-                  size: 20,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ],
-            ),
-          ),
+        },
+        background: Container(alignment: Alignment.centerLeft, padding: const EdgeInsets.only(left: 20), color: theme.colorScheme.tertiary, child: const Icon(Icons.push_pin)),
+        secondaryBackground: Container(alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), color: AuroraColors.error, child: const Icon(Icons.delete, color: Colors.white)),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          title: Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500)),
+          subtitle: Text('${s.modelName ?? ""}  ${s.messageCount} msgs  ${fmt.format(s.updatedAt)}', style: theme.textTheme.bodySmall),
+          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (s.isPinned) Icon(Icons.push_pin, size: 16, color: theme.colorScheme.primary),
+            IconButton(icon: const Icon(Icons.chevron_right, size: 20), onPressed: () { chat.selectSession(s.id); widget.onSwitchTab?.call(0); }),
+          ]),
+          onTap: () { chat.selectSession(s.id); widget.onSwitchTab?.call(0); },
         ),
       ),
     );

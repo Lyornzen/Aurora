@@ -1,99 +1,47 @@
 import 'package:flutter/material.dart';
 
+class AuroraColors {
+  static const primary = Color(0xFF7C4DFF);
+  static const secondary = Color(0xFFB39DDB);
+  static const tertiary = Color(0xFFF8BBD0);
+  static const error = Color(0xFFEF5350);
+  static const success = Color(0xFF4CAF50);
+  static const gradientStart = Color(0xFFC7AFFF);
+  static const gradientEnd = Color(0xFFF3C5E7);
+  static const darkGradientStart = Color(0xFF3D2A6B);
+  static const darkGradientEnd = Color(0xFF4A204B);
+}
+
+class AuroraRadius {
+  static const small = 12.0;
+  static const medium = 20.0;
+  static const large = 28.0;
+  static const extraLarge = 32.0;
+  static const chip = 20.0;
+  static const input = 24.0;
+}
+
+class AuroraSpacing {
+  static const xs = 4.0; static const sm = 8.0; static const md = 12.0;
+  static const lg = 16.0; static const xl = 24.0; static const xxl = 32.0;
+}
+
 class AppTheme {
-  static const _lightSchemeSeed = Color(0xFF6750A4);
+  static ThemeData light(Color? seed) => _build(ColorScheme.fromSeed(seedColor: seed ?? AuroraColors.primary, brightness: Brightness.light));
+  static ThemeData dark(Color? seed) => _build(ColorScheme.fromSeed(seedColor: seed ?? AuroraColors.primary, brightness: Brightness.dark));
 
-  static ThemeData light(Color? seedColor) {
-    final scheme = ColorScheme.fromSeed(
-      seedColor: seedColor ?? _lightSchemeSeed,
-      brightness: Brightness.light,
-    );
-    return _buildTheme(scheme);
-  }
-
-  static ThemeData dark(Color? seedColor) {
-    final scheme = ColorScheme.fromSeed(
-      seedColor: seedColor ?? _lightSchemeSeed,
-      brightness: Brightness.dark,
-    );
-    return _buildTheme(scheme);
-  }
-
-  static ThemeData _buildTheme(ColorScheme scheme) {
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: scheme,
-      brightness: scheme.brightness,
-      appBarTheme: AppBarTheme(
-        centerTitle: false,
-        elevation: 0,
-        backgroundColor: scheme.surface,
-        foregroundColor: scheme.onSurface,
-      ),
-      cardTheme: CardThemeData(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: scheme.surfaceContainerHighest,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
-          borderSide: BorderSide.none,
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      ),
-      navigationBarTheme: NavigationBarThemeData(
-        elevation: 0,
-        backgroundColor: scheme.surface,
-        indicatorColor: scheme.secondaryContainer,
-      ),
-      chipTheme: ChipThemeData(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-      ),
-      bottomSheetTheme: BottomSheetThemeData(
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-      ),
-    );
-  }
-
-  static const ColorScheme presetBlue = ColorScheme(
-    brightness: Brightness.light,
-    primary: Color(0xFF1565C0),
-    onPrimary: Color(0xFFFFFFFF),
-    primaryContainer: Color(0xFFD1E4FF),
-    onPrimaryContainer: Color(0xFF001D36),
-    secondary: Color(0xFF535F70),
-    onSecondary: Color(0xFFFFFFFF),
-    secondaryContainer: Color(0xFFD7E3F7),
-    onSecondaryContainer: Color(0xFF101C2B),
-    surface: Color(0xFFFDFBFF),
-    onSurface: Color(0xFF1B1B21),
-    surfaceContainerHighest: Color(0xFFF0F0F7),
-    error: Color(0xFFBA1A1A),
-    onError: Color(0xFFFFFFFF),
-  );
-
-  static const ColorScheme presetGreen = ColorScheme(
-    brightness: Brightness.light,
-    primary: Color(0xFF006D3B),
-    onPrimary: Color(0xFFFFFFFF),
-    primaryContainer: Color(0xFF93F7B4),
-    onPrimaryContainer: Color(0xFF00210E),
-    secondary: Color(0xFF4E6355),
-    onSecondary: Color(0xFFFFFFFF),
-    secondaryContainer: Color(0xFFD1E8D6),
-    onSecondaryContainer: Color(0xFF0C1F13),
-    surface: Color(0xFFFCFDF7),
-    onSurface: Color(0xFF191C1A),
-    surfaceContainerHighest: Color(0xFFEDF5EE),
-    error: Color(0xFFBA1A1A),
-    onError: Color(0xFFFFFFFF),
+  static ThemeData _build(ColorScheme s) => ThemeData(
+    useMaterial3: true, colorScheme: s, brightness: s.brightness, scaffoldBackgroundColor: s.surface,
+    appBarTheme: AppBarTheme(centerTitle: false, elevation: 0, scrolledUnderElevation: 1, backgroundColor: s.surface, foregroundColor: s.onSurface, surfaceTintColor: Colors.transparent),
+    cardTheme: CardThemeData(elevation: 0, surfaceTintColor: Colors.transparent, color: s.surfaceContainerHigh, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AuroraRadius.medium))),
+    inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: s.surfaceContainerHighest, isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(AuroraRadius.input), borderSide: BorderSide.none), contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12)),
+    navigationBarTheme: NavigationBarThemeData(elevation: 2, surfaceTintColor: Colors.transparent, backgroundColor: s.surface, indicatorColor: s.secondaryContainer ?? s.primary.withAlpha(30), height: 80, labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      iconTheme: WidgetStateProperty.resolveWith((st) => IconThemeData(color: st.contains(WidgetState.selected) ? s.primary : s.onSurfaceVariant, size: 26))),
+    chipTheme: ChipThemeData(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AuroraRadius.chip)), side: BorderSide.none, padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2)),
+    bottomSheetTheme: const BottomSheetThemeData(shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AuroraRadius.large))), showDragHandle: true),
+    dialogTheme: DialogThemeData(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AuroraRadius.large))),
+    dividerTheme: DividerThemeData(space: 1, thickness: 0.5, color: s.outlineVariant),
+    listTileTheme: ListTileThemeData(contentPadding: const EdgeInsets.symmetric(horizontal: AuroraSpacing.lg, vertical: 4), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AuroraRadius.small))),
+    floatingActionButtonTheme: FloatingActionButtonThemeData(elevation: 3, backgroundColor: s.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
   );
 }

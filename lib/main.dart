@@ -7,23 +7,19 @@ import 'app.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   final themeProvider = ThemeProvider();
   await themeProvider.load();
-
   final chatProvider = ChatProvider();
   final apiProvider = ApiProvider();
   await apiProvider.load();
   await chatProvider.load();
 
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider.value(value: themeProvider),
-        ChangeNotifierProvider.value(value: chatProvider),
-        ChangeNotifierProvider.value(value: apiProvider),
-      ],
-      child: const OpenSeekApp(),
-    ),
-  );
+  runApp(MultiProvider(
+    providers: [
+      ChangeNotifierProvider.value(value: themeProvider),
+      ChangeNotifierProvider.value(value: chatProvider),
+      ChangeNotifierProvider.value(value: apiProvider),
+    ],
+    child: const AuroraApp(),
+  ));
 }

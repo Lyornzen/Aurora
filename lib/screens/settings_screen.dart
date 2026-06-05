@@ -237,32 +237,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildColorSchemeTile(BuildContext context) {
-    final themeProvider = context.watch<ThemeProvider>();
-    return ListTile(
-      leading: const Icon(Icons.color_lens_outlined),
-      title: const Text('颜色方案'),
-      subtitle: Text(ThemeProvider.colorNames[themeProvider.seedColorIndex]),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ...ThemeProvider.presetColors.take(5).map((c) => Container(
-                width: 20,
-                height: 20,
-                margin: const EdgeInsets.symmetric(horizontal: 2),
-                decoration: BoxDecoration(
-                  color: c,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: themeProvider.seedColor == c
-                        ? Theme.of(context).colorScheme.primary
-                        : Colors.transparent,
-                    width: 2,
-                  ),
-                ),
-              )),
-        ],
-      ),
-      onTap: () => _showColorPicker(context),
+    return const ListTile(
+      leading: Icon(Icons.color_lens_outlined),
+      title: Text('颜色方案'),
+      subtitle: Text('Material You 动态色彩'),
     );
   }
 
@@ -312,64 +290,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 )),
             const SizedBox(height: 12),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showColorPicker(BuildContext context) {
-    final themeProvider = context.read<ThemeProvider>();
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _bottomSheetHeader('颜色方案'),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Wrap(
-                spacing: 16,
-                children: List.generate(ThemeProvider.presetColors.length,
-                    (i) => GestureDetector(
-                          onTap: () {
-                            themeProvider.setSeedColor(i);
-                            Navigator.pop(ctx);
-                          },
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: ThemeProvider.presetColors[i],
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: themeProvider.seedColorIndex == i
-                                        ? Theme.of(context).colorScheme.primary
-                                        : Colors.transparent,
-                                    width: 3,
-                                  ),
-                                ),
-                                child: themeProvider.seedColorIndex == i
-                                    ? const Icon(Icons.check,
-                                        color: Colors.white, size: 24)
-                                    : null,
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                ThemeProvider.colorNames[i],
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
-                        )),
-              ),
-            ),
-            const SizedBox(height: 24),
           ],
         ),
       ),
