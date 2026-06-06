@@ -1,0 +1,51 @@
+# ── Gradle ──
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# ── IDE ──
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── Android ──
+local.properties
+*.apk
+*.aab
+*.keystore
+!release.keystore
+app/release/
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ─── Kotlin ──
+*.class
+out/
+
+# ── Logs ──
+*.log
+*.hprof
+
+# ── Env (local toolchain, not part of source) ──
+Env/
+codewhale*.exe
+
+# ── Other projects ──
+AuroraDesign/
+OpenSeek/
+YumeBox-MaterialDesign/
+ffmpeg-gui/
+rikkahub_ref/
+build_aurora.bat
+build_aurora_clean.bat
+package-lock.json
+rules.md
