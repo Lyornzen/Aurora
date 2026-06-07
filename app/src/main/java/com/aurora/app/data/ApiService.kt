@@ -18,6 +18,8 @@ data class ApiConfig(
     val baseUrl: String,
     val models: List<String> = emptyList(),
     val enabled: Boolean = true,
+    val protocol: String = "openai", // "openai" or "anthropic"
+    val disabledModels: List<String> = emptyList(), // hidden in model picker
 )
 
 data class ChatMessage(
@@ -53,6 +55,11 @@ object ApiService {
                 for (j in 0 until modelsArray.length()) {
                     models.add(modelsArray.getString(j))
                 }
+                val disabledArray = obj.optJSONArray("disabledModels") ?: JSONArray()
+                val disabledModels = mutableListOf<String>()
+                for (j in 0 until disabledArray.length()) {
+                    disabledModels.add(disabledArray.getString(j))
+                }
                 val config = ApiConfig(
                     id = obj.getString("id"),
                     name = obj.getString("name"),
@@ -60,6 +67,8 @@ object ApiService {
                     baseUrl = obj.getString("baseUrl"),
                     models = models,
                     enabled = obj.optBoolean("enabled", true),
+                    protocol = obj.optString("protocol", "openai"),
+                    disabledModels = disabledModels,
                 )
                 configs.add(config)
             }
@@ -83,6 +92,10 @@ object ApiService {
                 put("baseUrl", config.baseUrl)
                 put("models", modelsArray)
                 put("enabled", config.enabled)
+                put("protocol", config.protocol)
+                val disabledArray = JSONArray()
+                for (m in config.disabledModels) { disabledArray.put(m) }
+                put("disabledModels", disabledArray)
             }
             array.put(obj)
         }
@@ -105,7 +118,30 @@ object ApiService {
     fun getEnabledConfigs(): List<ApiConfig> = configs.filter { it.enabled && it.apiKey.isNotBlank() }
 
     fun getAllModels(): List<Pair<String, String>> =
-        configs.filter { it.enabled }.flatMap { c -> c.models.map { it to "${c.name} / $it" } }
+        configs.filter { it.enabled }.flatMap { c ->
+            c.models.filter { it !in c.disabledModels }.map { it to "${c.name} / $it" }
+        }
+
+    fun reorderModels(configId: String, newOrder: List<String>) {
+        val idx = configs.indexOfFirst { it.id == configId }
+        if (idx >= 0) {
+            configs[idx] = configs[idx].copy(models = newOrder)
+            saveConfigs()
+        }
+    }
+
+    fun toggleModelDisabled(configId: String, modelId: String, disabled: Boolean) {
+        val idx = configs.indexOfFirst { it.id == configId }
+        if (idx >= 0) {
+            val cfg = configs[idx]
+            val newDisabled = if (disabled)
+                cfg.disabledModels + modelId
+            else
+                cfg.disabledModels - modelId
+            configs[idx] = cfg.copy(disabledModels = newDisabled)
+            saveConfigs()
+        }
+    }
 
     suspend fun fetchModels(baseUrl: String, apiKey: String): Result<List<String>> = withContext(Dispatchers.IO) {
         try {
@@ -146,42 +182,100 @@ object ApiService {
         messages: List<ChatMessage>,
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
-            val url = "${config.baseUrl.trim().trimEnd('/')}/chat/completions"
+            val isAnthropic = config.protocol == "anthropic"
 
-            val messagesArray = JSONArray()
-            for (msg in messages) {
-                messagesArray.put(JSONObject().apply {
-                    put("role", msg.role)
-                    put("content", msg.content)
-                })
-            }
+            // Anthropic Messages API
+            if (isAnthropic) {
+                val url = "${config.baseUrl.trim().trimEnd('/')}/messages"
 
-            val body = JSONObject().apply {
-                put("model", model)
-                put("messages", messagesArray)
-                put("temperature", 0.7)
-                put("max_tokens", 4096)
-            }.toString()
+                val messagesArray = JSONArray()
+                for (msg in messages) {
+                    messagesArray.put(JSONObject().apply {
+                        put("role", msg.role)
+                        put("content", msg.content)
+                    })
+                }
 
-            val request = Request.Builder()
-                .url(url)
-                .addHeader("Authorization", "Bearer ${config.apiKey.trim()}")
-                .addHeader("Content-Type", "application/json")
-                .post(body.toRequestBody("application/json".toMediaType()))
-                .build()
+                // Extract system message if present
+                var systemPrompt = ""
+                val nonSystemMessages = JSONArray()
+                for (i in 0 until messagesArray.length()) {
+                    val msg = messagesArray.getJSONObject(i)
+                    if (msg.getString("role") == "system") {
+                        systemPrompt = msg.getString("content")
+                    } else {
+                        nonSystemMessages.put(msg)
+                    }
+                }
 
-            val response = client.newCall(request).execute()
-            val responseBody = response.body?.string() ?: ""
+                val bodyObj = JSONObject().apply {
+                    put("model", model)
+                    put("messages", nonSystemMessages)
+                    put("max_tokens", 4096)
+                    if (systemPrompt.isNotEmpty()) {
+                        put("system", systemPrompt)
+                    }
+                }.toString()
 
-            if (response.isSuccessful) {
-                val json = JSONObject(responseBody)
-                val choices = json.optJSONArray("choices")
-                val content = choices?.optJSONObject(0)
-                    ?.optJSONObject("message")
-                    ?.optString("content") ?: "No response"
-                Result.success(content)
+                val request = Request.Builder()
+                    .url(url)
+                    .addHeader("x-api-key", config.apiKey.trim())
+                    .addHeader("anthropic-version", "2023-06-01")
+                    .addHeader("Content-Type", "application/json")
+                    .post(bodyObj.toRequestBody("application/json".toMediaType()))
+                    .build()
+
+                val response = client.newCall(request).execute()
+                val responseBody = response.body?.string() ?: ""
+
+                if (response.isSuccessful) {
+                    val json = JSONObject(responseBody)
+                    val content = json.optJSONArray("content")
+                        ?.optJSONObject(0)
+                        ?.optString("text") ?: "No response"
+                    Result.success(content)
+                } else {
+                    Result.failure(Exception("HTTP ${response.code}: $responseBody"))
+                }
             } else {
-                Result.failure(Exception("HTTP ${response.code}: $responseBody"))
+                // OpenAI-compatible /chat/completions
+                val url = "${config.baseUrl.trim().trimEnd('/')}/chat/completions"
+
+                val messagesArray = JSONArray()
+                for (msg in messages) {
+                    messagesArray.put(JSONObject().apply {
+                        put("role", msg.role)
+                        put("content", msg.content)
+                    })
+                }
+
+                val body = JSONObject().apply {
+                    put("model", model)
+                    put("messages", messagesArray)
+                    put("temperature", 0.7)
+                    put("max_tokens", 4096)
+                }.toString()
+
+                val request = Request.Builder()
+                    .url(url)
+                    .addHeader("Authorization", "Bearer ${config.apiKey.trim()}")
+                    .addHeader("Content-Type", "application/json")
+                    .post(body.toRequestBody("application/json".toMediaType()))
+                    .build()
+
+                val response = client.newCall(request).execute()
+                val responseBody = response.body?.string() ?: ""
+
+                if (response.isSuccessful) {
+                    val json = JSONObject(responseBody)
+                    val choices = json.optJSONArray("choices")
+                    val content = choices?.optJSONObject(0)
+                        ?.optJSONObject("message")
+                        ?.optString("content") ?: "No response"
+                    Result.success(content)
+                } else {
+                    Result.failure(Exception("HTTP ${response.code}: $responseBody"))
+                }
             }
         } catch (e: Exception) {
             Result.failure(e)
