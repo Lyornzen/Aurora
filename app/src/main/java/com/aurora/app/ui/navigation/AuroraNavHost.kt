@@ -42,6 +42,7 @@ fun AuroraNavHost(
 ) {
     val navController = rememberNavController()
     var selectedTab by remember { mutableStateOf(AuroraTab.Chat) }
+    var scrollToTopTrigger by remember { mutableStateOf(0) }
 
     Scaffold(
         modifier = modifier,
@@ -52,13 +53,18 @@ fun AuroraNavHost(
             AuroraBottomBar(
                 selectedTab = selectedTab,
                 onTabSelected = { tab ->
-                    selectedTab = tab
-                    navController.navigate(tab.route) {
-                        popUpTo(navController.graph.startDestinationId) {
-                            saveState = true
+                    if (tab == AuroraTab.Chat && selectedTab == AuroraTab.Chat) {
+                        // Double-tap Chat tab → scroll to top
+                        scrollToTopTrigger++
+                    } else {
+                        selectedTab = tab
+                        navController.navigate(tab.route) {
+                            popUpTo(navController.graph.startDestinationId) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
                         }
-                        launchSingleTop = true
-                        restoreState = true
                     }
                 },
             )
@@ -69,7 +75,7 @@ fun AuroraNavHost(
             startDestination = AuroraRoutes.CHAT,
             modifier = Modifier.padding(innerPadding),
         ) {
-            composable(AuroraRoutes.CHAT) { ChatScreen() }
+            composable(AuroraRoutes.CHAT) { ChatScreen(scrollToTopTrigger = scrollToTopTrigger) }
             composable(AuroraRoutes.TASKS) { TasksScreen() }
             composable(AuroraRoutes.LINKS) { LinksScreen() }
             composable(AuroraRoutes.HISTORY) {

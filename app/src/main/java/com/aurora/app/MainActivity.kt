@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import com.aurora.app.ui.navigation.AuroraNavHost
 import com.aurora.app.ui.theme.AuroraTheme
 import com.aurora.app.data.ApiService
+import com.aurora.app.data.ChatSession
 import com.aurora.app.data.ConversationStore
 import com.aurora.app.data.UserProfile
 import com.aurora.app.ui.theme.Primary
@@ -35,5 +36,10 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        ChatSession.ensureSaved()
     }
 }
