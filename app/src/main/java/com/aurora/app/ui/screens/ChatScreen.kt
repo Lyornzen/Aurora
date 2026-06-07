@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -33,7 +34,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.rounded.AutoAwesome
@@ -51,7 +51,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -70,6 +69,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -83,7 +84,8 @@ import com.aurora.app.data.ChatSession
 import com.aurora.app.data.Message
 import com.aurora.app.data.Role
 import com.aurora.app.data.UserProfile
-import com.aurora.app.ui.components.MarkdownText
+import com.aurora.app.ui.components.MarkdownRenderer
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
@@ -110,6 +112,8 @@ fun ChatScreen(modifier: Modifier = Modifier) {
     val messages = ChatSession.messages
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val colorScheme = MaterialTheme.colorScheme
 
     // Build model list: configured models first, then defaults — recompute on config change
@@ -145,24 +149,40 @@ fun ChatScreen(modifier: Modifier = Modifier) {
         else -> stringResource(R.string.chat_good_evening)
     }
 
-    // Auto-scroll to bottom when messages change
-    LaunchedEffect(messages.size, loading) {
+    // Auto-scroll to bottom when messages change (immediate)
+    LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+            listState.scrollToItem(messages.size - 1)
         }
     }
 
-    // Save conversation when navigating away
+    // Delayed re-scroll after loading completes — waits for WebView/Markdown to finish rendering
+    LaunchedEffect(loading) {
+        if (!loading && messages.isNotEmpty()) {
+            kotlinx.coroutines.delay(600)
+            listState.scrollToItem(messages.size - 1)
+        }
+    }
+
+    // Track active request for cancellation
+    var activeJob by remember { mutableStateOf<Job?>(null) }
+
+    // Save conversation and cancel pending request when navigating away
     DisposableEffect(Unit) {
-        onDispose { ChatSession.ensureSaved() }
+        onDispose {
+            activeJob?.cancel()
+            ChatSession.ensureSaved()
+        }
     }
 
     // Periodically check for config changes (API keys added/removed)
     LaunchedEffect(Unit) {
         while (true) {
             kotlinx.coroutines.delay(2000)
-            val currentCount = ApiService.getEnabledConfigs().size
-            if (currentCount > 0 && configuredModels.size != ApiService.getAllModels().size) {
+            val currentModels = ApiService.getAllModels()
+            if (currentModels.isNotEmpty() && currentModels != configuredModels.flatMap { configured ->
+                configured.id.let { modelId -> listOf(modelId to modelId) }
+            }) {
                 configVersion++
             }
         }
@@ -179,10 +199,14 @@ fun ChatScreen(modifier: Modifier = Modifier) {
         val content = (text ?: input).trim()
         if (content.isNotEmpty()) {
             input = ""
+            keyboardController?.hide()
+            focusManager.clearFocus()
             messages.add(Message(System.nanoTime().toString(), Role.User, content, ts = "now"))
+            // Cancel any in-flight request before starting a new one
+            activeJob?.cancel()
             loading = true
 
-            scope.launch {
+            activeJob = scope.launch {
                 val enabledConfigs = ApiService.getEnabledConfigs()
                 if (enabledConfigs.isEmpty()) {
                     messages.add(Message(
@@ -193,6 +217,7 @@ fun ChatScreen(modifier: Modifier = Modifier) {
                         ts = "now",
                     ))
                     loading = false
+                    activeJob = null
                 } else {
                     val config = enabledConfigs.find { it.models.contains(selectedModel.id) }
                         ?: enabledConfigs.first()
@@ -225,6 +250,7 @@ fun ChatScreen(modifier: Modifier = Modifier) {
                         }
                     )
                     loading = false
+                    activeJob = null
                 }
             }
         }
@@ -251,7 +277,14 @@ fun ChatScreen(modifier: Modifier = Modifier) {
                     )
                 }
                 items(messages, key = { it.id }) { msg ->
-                    MessageCard(message = msg, colorScheme = colorScheme)
+                    MessageCard(
+                        message = msg,
+                        colorScheme = colorScheme,
+                        onRetry = {
+                            val lastUser = messages.lastOrNull { it.role == Role.User }
+                            if (lastUser != null) send(lastUser.content)
+                        },
+                    )
                 }
                 if (loading) {
                     item { LoadingDots(modelName = selectedModel.name, colorScheme = colorScheme) }
@@ -486,7 +519,7 @@ private fun ModelSelectorCard(model: Model, colorScheme: androidx.compose.materi
 }
 
 @Composable
-private fun MessageCard(message: Message, colorScheme: androidx.compose.material3.ColorScheme) {
+private fun MessageCard(message: Message, colorScheme: androidx.compose.material3.ColorScheme, onRetry: () -> Unit = {}) {
     val context = LocalContext.current
     val view = LocalView.current
 
@@ -527,12 +560,8 @@ private fun MessageCard(message: Message, colorScheme: androidx.compose.material
                     Text(message.ts, fontSize = 10.sp, color = colorScheme.onSurfaceVariant)
                 }
                 Spacer(Modifier.height(10.dp))
-                MarkdownText(
-                    text = message.content,
-                    textColor = colorScheme.onSurface,
-                    codeBg = colorScheme.primary,
-                    fontSize = 14f,
-                    lineHeight = 22f,
+                MarkdownRenderer(
+                    content = message.content,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(12.dp))
@@ -565,12 +594,12 @@ private fun MessageCard(message: Message, colorScheme: androidx.compose.material
                         Icon(Icons.Outlined.Share, stringResource(R.string.label_share), tint = colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp))
                     }
-                    // More
+                    // Retry
                     IconButton(
-                        onClick = { },
+                        onClick = onRetry,
                         modifier = Modifier.size(32.dp)
                     ) {
-                        Icon(Icons.Outlined.MoreHoriz, stringResource(R.string.label_more), tint = colorScheme.onSurfaceVariant,
+                        Icon(Icons.Outlined.Refresh, stringResource(R.string.label_retry), tint = colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp))
                     }
                 }
@@ -652,7 +681,7 @@ private fun InputBar(
         modifier = modifier
             .background(colorScheme.background)
             .padding(horizontal = 16.dp)
-            .padding(bottom = 10.dp, top = 4.dp),
+            .padding(bottom = 2.dp, top = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
             IconButton(
@@ -675,6 +704,7 @@ private fun InputBar(
                 .padding(horizontal = 10.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // TODO: Implement file attachment
             IconButton(onClick = {}, modifier = Modifier.size(30.dp)) {
                 Box(modifier = Modifier.size(28.dp).clip(RoundedCornerShape(8.dp))
                     .background(colorScheme.surface)
@@ -687,7 +717,7 @@ private fun InputBar(
                 value = input,
                 onValueChange = onInputChange,
                 placeholder = { Text(stringResource(R.string.chat_placeholder), color = colorScheme.onSurfaceVariant, fontSize = 14.sp) },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).heightIn(max = 120.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Color.Transparent,
                     unfocusedBorderColor = Color.Transparent,
@@ -697,8 +727,9 @@ private fun InputBar(
                     color = colorScheme.onSurface,
                     fontWeight = FontWeight.Medium,
                 ),
-                maxLines = 1,
+                maxLines = 5,
             )
+            // TODO: Implement voice input
             IconButton(onClick = {}, modifier = Modifier.size(30.dp)) {
                 Box(modifier = Modifier.size(28.dp).clip(RoundedCornerShape(10.dp))
                     .background(colorScheme.secondaryContainer)

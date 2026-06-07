@@ -109,7 +109,6 @@ fun AuroraBottomBar(
         }
     }
 }
-
 @Composable
 private fun RowScope.TabItem(
     tab: AuroraTab,
@@ -172,6 +171,3 @@ private fun RowScope.TabItem(
     }
 }
 
-private fun Color.luminance(): Float {
-    return 0.299f * red + 0.587f * green + 0.114f * blue
-}

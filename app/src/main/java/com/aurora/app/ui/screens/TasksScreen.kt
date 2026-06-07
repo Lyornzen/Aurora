@@ -84,6 +84,7 @@ data class Task(
     val category: String,
 )
 
+// TODO: Replace with actual task data source once task management is implemented
 private val TASKS = emptyList<Task>()
 
 private data class StatusMeta(val label: String, val color: Color, val bg: Color, val icon: ImageVector?)
@@ -231,6 +232,7 @@ fun TasksScreen(modifier: Modifier = Modifier) {
                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                     shape = RoundedCornerShape(16.dp),
                 )
+                // TODO: Bind to a description state variable when task creation is fully implemented
                 OutlinedTextField(
                     value = "",
                     onValueChange = {},
@@ -289,6 +291,7 @@ private fun TaskCard(task: Task) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(task.title, style = MaterialTheme.typography.titleMedium, color = colorScheme.onSurface,
                             modifier = Modifier.weight(1f))
+                        // TODO: Implement task context menu
                         IconButton(onClick = {}, modifier = Modifier.size(24.dp)) {
                             Icon(Icons.Outlined.MoreVert, null, tint = colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                         }

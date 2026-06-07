@@ -76,6 +76,7 @@ private data class Device(
 )
 private data class QuickAction(val icon: ImageVector, val label: String, val bg: Color, val fg: Color)
 
+// TODO: Replace with actual device discovery data source
 private val DEVICES = emptyList<Device>()
 
 // ─── LinksScreen ────────────────────────────────────────────────
@@ -126,6 +127,7 @@ fun LinksScreen(modifier: Modifier = Modifier) {
                             tint = colorScheme.primary, modifier = Modifier.size(20.dp)
                                 .then(if (syncing) Modifier.rotate(rotation) else Modifier))
                     }
+                    // TODO: Implement sync/refresh
                     IconButton(
                         onClick = {},
                         modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(colorScheme.primary),
@@ -206,6 +208,7 @@ fun LinksScreen(modifier: Modifier = Modifier) {
                     modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     quickActions.forEach { action ->
+                        // TODO: Implement quick action handlers
                         Card(
                             modifier = Modifier.fillMaxWidth().clickable {},
                             shape = RoundedCornerShape(20.dp),
@@ -246,6 +249,7 @@ fun LinksScreen(modifier: Modifier = Modifier) {
                 colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             ) {
+                // TODO: Implement device addition (QR code scan / IP input)
                 Row(
                     modifier = Modifier.clickable {}.padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -297,6 +301,7 @@ private fun DeviceCard(device: Device) {
                     Text(device.name, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.W600,
                         modifier = Modifier.weight(1f))
+                    // TODO: Implement device context menu
                     IconButton(onClick = {}, modifier = Modifier.size(24.dp)) {
                         Icon(Icons.Outlined.MoreVert, null, tint = colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                     }

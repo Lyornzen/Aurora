@@ -64,4 +64,5 @@
     <string name="label_copy">Copy</string>
     <string name="label_share">Share</string>
     <string name="label_more">More</string>
+    <string name="label_retry">Retry</string>
 </resources>

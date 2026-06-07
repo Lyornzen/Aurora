@@ -1,6 +1,11 @@
 package com.aurora.app.ui.navigation
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,6 +45,9 @@ fun AuroraNavHost(
 
     Scaffold(
         modifier = modifier,
+        contentWindowInsets = WindowInsets.systemBars
+            .union(WindowInsets.navigationBars)
+            .union(WindowInsets.ime),
         bottomBar = {
             AuroraBottomBar(
                 selectedTab = selectedTab,

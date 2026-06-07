@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<link rel="stylesheet" href="katex/katex.min.css">
+<style>
+:root{--bg:#fff;--text:#1a1a1a;--surface:#f5f5f5;--border:#e0e0e0;--primary:#1a7f37;--code-bg:#f0f0f0}
+body.dark{--bg:#121212;--text:#e0e0e0;--surface:#1e1e1e;--border:#333;--primary:#7ee787;--code-bg:#1a1a2e}
+*{margin:0;padding:0;box-sizing:border-box}
+html{font-size:16px;-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans SC',sans-serif;font-size:15px;line-height:1.7;padding:8px 12px;word-wrap:break-word}
+h1,h2,h3,h4,h5,h6{margin:14px 0 8px;font-weight:600;line-height:1.3}
+h1{font-size:1.5em;border-bottom:1px solid var(--border);padding-bottom:6px}
+h2{font-size:1.3em;border-bottom:1px solid var(--border);padding-bottom:4px}
+h3{font-size:1.15em}h4{font-size:1.05em}
+p{margin:6px 0}
+a{color:var(--primary);text-decoration:none}
+code{background:var(--code-bg);padding:2px 6px;border-radius:4px;font-family:monospace;font-size:.88em}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin:8px 0;overflow-x:auto;font-size:.85em;line-height:1.5}
+pre code{background:none;padding:0;border-radius:0}
+ul,ol{padding-left:24px;margin:6px 0}li{margin:3px 0}
+blockquote{border-left:4px solid var(--primary);padding-left:12px;margin:8px 0;opacity:.8}
+table{border-collapse:collapse;width:100%;margin:8px 0}
+th,td{border:1px solid var(--border);padding:8px 12px;text-align:left}th{background:var(--code-bg);font-weight:600}
+hr{border:none;border-top:1px solid var(--border);margin:12px 0}
+img{max-width:100%;height:auto;border-radius:8px}
+.katex-display{margin:12px 0;overflow-x:auto;overflow-y:hidden}
+.katex{font-size:1.1em}
+</style>
+</head>
+<body><div id="content"></div>
+
+<script src="marked/marked.min.js"></script>
+<script src="katex/katex.min.js"></script>
+<script src="katex/auto-render.min.js"></script>
+
+<script>
+// ─── 核心渲染逻辑 ─────────────────────────────────────────────────
+
+// 渲染版本号，每次 initRender 递增，reportHeight 只上报最新渲染的高度
+var renderId = 0;
+
+// 上报内容高度（使用 #content 的实际高度），id 不匹配则忽略过期回调
+function reportHeight(id){
+  [80, 250, 600, 1200].forEach(function(delay){
+    setTimeout(function(){
+      if (id !== renderId) return; // 过期渲染，丢弃
+      var el = document.getElementById('content');
+      var h = el ? el.scrollHeight : document.body.scrollHeight;
+      h += 16; // 8px top + 8px bottom
+      if(window.AndroidBridge) window.AndroidBridge.onHeight(h);
+    }, delay);
+  });
+}
+
+// 等待依赖就绪后执行渲染
+function waitForDeps(callback, retries, id) {
+  retries = retries || 0;
+  var maxRetries = 30; // 最多等 30 秒
+
+  if (typeof marked !== 'undefined' && typeof renderMathInElement !== 'undefined') {
+    callback();
+    return;
+  }
+
+  if (retries >= maxRetries) {
+    // 超时：尝试降级渲染
+    var content = document.getElementById('content');
+    if (typeof marked !== 'undefined') {
+      try {
+        marked.setOptions({gfm:true, breaks:true});
+        content.innerHTML = marked.parse(currentRaw);
+      } catch(e) { content.innerHTML = '<p>Render error</p>'; }
+    } else {
+      content.innerHTML = '<pre>' + escapeHtml(currentRaw) + '</pre>';
+    }
+    reportHeight(id);
+    return;
+  }
+
+  setTimeout(function(){ waitForDeps(callback, retries + 1, id); }, 1000);
+}
+
+function escapeHtml(text) {
+  return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Base64 → UTF-8 安全解码（atob 只能处理 Latin-1，中文等多字节字符会乱码）
+function b64ToUTF8(encoded) {
+  var binary = atob(encoded);
+  var bytes = new Uint8Array(binary.length);
+  for (var i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+// 当前原始 Markdown 文本（渲染前保存，用于降级回退）
+var currentRaw = '';
+
+// ─── LaTeX 保护 ──────────────────────────────────────────────
+// marked.parse() 按 CommonMark 规范将 \( \[ 中的反斜杠当作转义符吞掉，
+// 导致 KaTeX 找不到分隔符。在 marked 前用占位符保护数学块，解析完再还原。
+
+var mathBlocks = [];
+
+function protectLatex(raw) {
+  mathBlocks = [];
+  // 注意顺序：先匹配跨行的块级公式，再匹配行内公式
+  // $$...$$  块级（跨行）
+  raw = raw.replace(/\$\$([\s\S]*?)\$\$/g, function(m) {
+    mathBlocks.push(m);
+    return '\u0000M' + (mathBlocks.length - 1) + '\u0000';
+  });
+  // \[...\]  块级（跨行）
+  raw = raw.replace(/\\\[([\s\S]*?)\\\]/g, function(m) {
+    mathBlocks.push(m);
+    return '\u0000M' + (mathBlocks.length - 1) + '\u0000';
+  });
+  // $...$  行内（不跨行，内容非空）
+  raw = raw.replace(/\$([^\$\n]+)\$/g, function(m) {
+    mathBlocks.push(m);
+    return '\u0000M' + (mathBlocks.length - 1) + '\u0000';
+  });
+  // \(...\)  行内（不跨行）
+  raw = raw.replace(/\\\(([^\)\n]+)\\\)/g, function(m) {
+    mathBlocks.push(m);
+    return '\u0000M' + (mathBlocks.length - 1) + '\u0000';
+  });
+  return raw;
+}
+
+function restoreLatex(html) {
+  for (var i = 0; i < mathBlocks.length; i++) {
+    // 转义 HTML 实体中的 < > &（marked 可能已转义占位符周围的文本）
+    var escaped = mathBlocks[i]
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    html = html.split('\u0000M' + i + '\u0000').join(escaped);
+  }
+  return html;
+}
+
+// ─── initRender ──────────────────────────────────────────────
+
+function initRender(encoded, isDark) {
+  var id = ++renderId;
+
+  try {
+    currentRaw = b64ToUTF8(encoded);
+  } catch(e) {
+    currentRaw = 'Decode error';
+  }
+
+  document.body.className = (isDark === true || isDark === 'true') ? 'dark' : '';
+
+  waitForDeps(function(){
+    if (id !== renderId) return;
+    var content = document.getElementById('content');
+    marked.setOptions({gfm:true, breaks:true});
+
+    try {
+      // 1. 保护 LaTeX 数学块，防止 marked 转义反斜杠
+      var safe = protectLatex(currentRaw);
+      // 2. marked 解析 Markdown → HTML
+      var html = marked.parse(safe);
+      // 3. 还原被保护的 LaTeX 数学块
+      html = restoreLatex(html);
+      content.innerHTML = html;
+    } catch(e) {
+      content.innerHTML = '<p>Markdown parse error</p>';
+      reportHeight(id);
+      return;
+    }
+
+    try {
+      renderMathInElement(content, {
+        delimiters: [
+          {left:'$$', right:'$$', display:true},
+          {left:'$',  right:'$',  display:false},
+          {left:'\\[',right:'\\]',display:true},
+          {left:'\\(',right:'\\)',display:false}
+        ],
+        throwOnError: false,
+        errorColor: '#cc0000',
+        strict: false,
+        trust: true
+      });
+    } catch(e) {
+      // KaTeX 错误，保留已渲染的 HTML
+    }
+
+    reportHeight(id);
+  }, 0, id);
+}
+</script>
+</body>
+</html>

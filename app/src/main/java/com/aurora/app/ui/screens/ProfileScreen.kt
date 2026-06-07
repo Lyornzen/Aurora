@@ -103,7 +103,7 @@ fun ProfileScreen(
     var refreshTick by remember { mutableStateOf(0) }
     LaunchedEffect(Unit) {
         while (true) {
-            kotlinx.coroutines.delay(2000)
+            kotlinx.coroutines.delay(5000)
             val fresh = ApiService.getConfigs()
             if (fresh != apiConfigs) {
                 apiConfigs = fresh
@@ -332,6 +332,7 @@ fun ProfileScreen(
                             "Terms of Service" to null,
                             "Send Feedback" to null,
                         ).forEachIndexed { i, (label, value) ->
+                            // TODO: Navigate to respective detail screens
                             Row(
                                 modifier = Modifier.fillMaxWidth()
                                     .clickable {}.padding(horizontal = 16.dp, vertical = 13.dp),
@@ -361,6 +362,7 @@ fun ProfileScreen(
         // ── Sign Out ──
         item {
             Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
+                // TODO: Implement sign-out / account management
                 Button(
                     onClick = {},
                     modifier = Modifier.fillMaxWidth().height(50.dp),

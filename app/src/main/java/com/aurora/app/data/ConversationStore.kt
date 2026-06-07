@@ -116,7 +116,10 @@ object ConversationStore {
         val idx = _conversations.indexOfFirst { it.id == id }
         if (idx >= 0) {
             val conv = _conversations[idx]
-            _conversations[idx] = conv.copy(timestamp = if (conv.timestamp < 0) -conv.timestamp else -conv.timestamp - 1)
+            _conversations[idx] = conv.copy(
+                timestamp = if (conv.timestamp < 0) kotlin.math.abs(conv.timestamp)
+                else -(kotlin.math.abs(conv.timestamp) + 1)
+            )
             saveConversations()
         }
     }
