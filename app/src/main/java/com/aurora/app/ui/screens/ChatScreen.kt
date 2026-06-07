@@ -76,6 +76,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -129,7 +130,7 @@ fun ChatScreen(
         val configs = ApiService.getEnabledConfigs()
         val models = mutableListOf<Model>()
         configs.forEach { config ->
-            config.models.forEach { modelId ->
+            config.models.filter { it !in config.disabledModels }.forEach { modelId ->
                 models.add(Model(modelId, modelId, emptyList(), config.name))
             }
         }
@@ -143,10 +144,15 @@ fun ChatScreen(
 
     var input by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
-    var selectedModel by remember(configVersion) {
-        mutableStateOf(allModels.firstOrNull() ?: DEFAULT_MODELS[0])
-    }
+    var selectedModel by remember { mutableStateOf(allModels.firstOrNull() ?: DEFAULT_MODELS[0]) }
     var showModelSheet by remember { mutableStateOf(false) }
+
+    // Only reset selectedModel when it disappears from the new model list
+    LaunchedEffect(configVersion) {
+        if (allModels.none { it.id == selectedModel.id }) {
+            selectedModel = allModels.firstOrNull() ?: DEFAULT_MODELS[0]
+        }
+    }
     val listState = rememberLazyListState()
 
     // Whether user has scrolled away from the bottom
@@ -200,11 +206,11 @@ fun ChatScreen(
     // Periodically check for config changes (API keys added/removed)
     LaunchedEffect(Unit) {
         while (true) {
-            kotlinx.coroutines.delay(2000)
+            kotlinx.coroutines.delay(5000)
             val currentModels = ApiService.getAllModels()
-            if (currentModels.isNotEmpty() && currentModels != configuredModels.flatMap { configured ->
-                configured.id.let { modelId -> listOf(modelId to modelId) }
-            }) {
+            val currentIds = currentModels.map { it.first }.toSet()
+            val configuredIds = configuredModels.map { it.id }.toSet()
+            if (currentIds != configuredIds) {
                 configVersion++
             }
         }
@@ -362,13 +368,15 @@ fun ChatScreen(
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             containerColor = colorScheme.surface,
         ) {
-            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                Text(stringResource(R.string.chat_choose_model), style = MaterialTheme.typography.titleLarge,
-                    color = colorScheme.primary, fontWeight = FontWeight.Bold)
-                Text(stringResource(R.string.chat_select_model_hint),
-                    style = MaterialTheme.typography.bodyMedium, color = colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(12.dp))
-                allModels.forEach { m ->
+            LazyColumn(modifier = Modifier.padding(horizontal = 16.dp)) {
+                item {
+                    Text(stringResource(R.string.chat_choose_model), style = MaterialTheme.typography.titleLarge,
+                        color = colorScheme.primary, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.chat_select_model_hint),
+                        style = MaterialTheme.typography.bodyMedium, color = colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(12.dp))
+                }
+                items(allModels, key = { it.id }) { m ->
                     val isSelected = m.id == selectedModel.id
                     val isConfigured = configuredModels.any { it.id == m.id }
                     Row(
@@ -433,7 +441,7 @@ fun ChatScreen(
                     }
                     Spacer(Modifier.height(4.dp))
                 }
-                Spacer(Modifier.height(24.dp))
+                item { Spacer(Modifier.height(24.dp)) }
             }
         }
     }
@@ -582,8 +590,8 @@ private fun MessageCard(message: Message, colorScheme: androidx.compose.material
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(message.content, style = MaterialTheme.typography.bodyMedium,
-                        color = colorScheme.primary, lineHeight = 22.sp, fontWeight = FontWeight.Medium)
+                    Text(message.content, style = MaterialTheme.typography.bodyLarge,
+                        color = colorScheme.primary, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(4.dp))
                     Text(message.ts, fontSize = 10.sp, color = colorScheme.onSurfaceVariant)
                 }

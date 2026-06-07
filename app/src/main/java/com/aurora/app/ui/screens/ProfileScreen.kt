@@ -1,5 +1,6 @@
 package com.aurora.app.ui.screens
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChevronRight
@@ -26,7 +30,10 @@ import androidx.compose.material.icons.rounded.Api
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Error
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -41,6 +48,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -152,50 +160,83 @@ fun ProfileScreen(
             }
         }
 
-        // ── Active Models ──
+        // ── Model Management ──
         item { SectionLabel("Active Models", Icons.Rounded.AutoAwesome, accentColor, colorScheme) }
         item {
-            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.large,
-                    colors = CardDefaults.cardColors(containerColor = colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        val allModels = remember(refreshTick) { ApiService.getAllModels() }
-                        if (allModels.isEmpty()) {
-                            Text("No models configured", style = MaterialTheme.typography.bodyMedium,
-                                color = colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
-                            Text("Add an API key below to get started", fontSize = 12.sp,
-                                color = colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
-                        } else {
-                            allModels.forEachIndexed { i, (modelId, label) ->
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(modifier = Modifier.size(38.dp).clip(RoundedCornerShape(11.dp))
-                                        .background(accentColor.copy(alpha = 0.12f)),
-                                        contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Rounded.AutoAwesome, null, tint = accentColor,
-                                            modifier = Modifier.size(20.dp))
+            androidx.compose.runtime.key(refreshTick) {
+                val configsForModels = ApiService.getConfigs().filter { it.enabled }
+                Column {
+                    configsForModels.forEach { config ->
+                        val allConfigModels = config.models.filter { it !in config.disabledModels } +
+                            config.models.filter { it in config.disabledModels }
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                            shape = MaterialTheme.shapes.large,
+                            colors = CardDefaults.cardColors(containerColor = colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp).animateContentSize()) {
+                                Text(config.name, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                                    color = accentColor, modifier = Modifier.padding(bottom = 8.dp))
+                                if (allConfigModels.isEmpty()) {
+                                    Text("No models", fontSize = 12.sp, color = colorScheme.onSurfaceVariant)
+                                } else {
+                                    allConfigModels.forEachIndexed { i, modelId ->
+                                        val isDisabled = modelId in config.disabledModels
+                                        val alpha = if (isDisabled) 0.4f else 1f
+                                        Row(verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.padding(vertical = 4.dp)) {
+                                            Box(
+                                                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp))
+                                                    .background(if (isDisabled) colorScheme.surfaceVariant else accentColor.copy(alpha = 0.12f))
+                                                    .clickable {
+                                                        ApiService.toggleModelDisabled(config.id, modelId, !isDisabled)
+                                                        refreshTick++
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    if (isDisabled) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                                    contentDescription = if (isDisabled) "Show" else "Hide",
+                                                    tint = if (isDisabled) colorScheme.onSurfaceVariant else accentColor,
+                                                    modifier = Modifier.size(20.dp))
+                                            }
+                                            Spacer(Modifier.width(4.dp))
+                                            Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(9.dp))
+                                                .background(accentColor.copy(alpha = 0.12f * alpha)),
+                                                contentAlignment = Alignment.Center) {
+                                                Icon(Icons.Rounded.AutoAwesome, null, tint = accentColor.copy(alpha = alpha),
+                                                    modifier = Modifier.size(16.dp))
+                                            }
+                                            Spacer(Modifier.width(8.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(modelId, fontSize = 13.sp,
+                                                    color = colorScheme.onSurface.copy(alpha = alpha),
+                                                    fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                                Text(if (isDisabled) "Inactive" else "Active", fontSize = 10.sp,
+                                                    color = if (isDisabled) colorScheme.onSurfaceVariant.copy(alpha = 0.4f) else accentColor,
+                                                    fontWeight = FontWeight.Medium)
+                                            }
+                                            if (i > 0) IconButton(onClick = {
+                                                val reordered = allConfigModels.toMutableList()
+                                                reordered.removeAt(i); reordered.add(i - 1, modelId)
+                                                ApiService.reorderModels(config.id, reordered); refreshTick++
+                                            }, modifier = Modifier.size(28.dp)) {
+                                                Icon(Icons.Rounded.KeyboardArrowUp, null,
+                                                    tint = colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                                            }
+                                            if (i < allConfigModels.size - 1) IconButton(onClick = {
+                                                val reordered = allConfigModels.toMutableList()
+                                                reordered.removeAt(i); reordered.add(i + 1, modelId)
+                                                ApiService.reorderModels(config.id, reordered); refreshTick++
+                                            }, modifier = Modifier.size(28.dp)) {
+                                                Icon(Icons.Rounded.KeyboardArrowDown, null,
+                                                    tint = colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                                            }
+                                        }
+                                        if (i < allConfigModels.size - 1)
+                                            HorizontalDivider(color = colorScheme.surfaceVariant.copy(alpha = 0.5f))
                                     }
-                                    Spacer(Modifier.width(12.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(modelId, style = MaterialTheme.typography.titleMedium,
-                                            color = colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
-                                        Text(label, fontSize = 11.sp, color = colorScheme.onSurfaceVariant,
-                                            fontWeight = FontWeight.Medium)
-                                    }
-                                    Box(modifier = Modifier.clip(RoundedCornerShape(6.dp))
-                                        .background(colorScheme.primaryContainer)
-                                        .padding(horizontal = 8.dp, vertical = 2.dp)) {
-                                        Text("Active", fontSize = 11.sp, fontWeight = FontWeight.Bold,
-                                            color = accentColor)
-                                    }
-                                }
-                                if (i < allModels.size - 1) {
-                                    Spacer(Modifier.height(12.dp))
-                                    HorizontalDivider(color = colorScheme.surfaceVariant)
-                                    Spacer(Modifier.height(12.dp))
                                 }
                             }
                         }
@@ -326,22 +367,28 @@ fun ProfileScreen(
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 ) {
                     Column {
+                        var showDisclaimer by remember { mutableStateOf(false) }
+                        var showLicenses by remember { mutableStateOf(false) }
                         listOf(
-                            "App Version" to "Aurora 2.1.0",
-                            "Privacy Policy" to null,
-                            "Terms of Service" to null,
+                            "App Version" to "Aurora 1.2.0",
+                            "Privacy & Terms" to "disclaimer",
+                            "Open Source Licenses" to "licenses",
                             "Send Feedback" to null,
                         ).forEachIndexed { i, (label, value) ->
-                            // TODO: Navigate to respective detail screens
                             Row(
                                 modifier = Modifier.fillMaxWidth()
-                                    .clickable {}.padding(horizontal = 16.dp, vertical = 13.dp),
+                                    .clickable {
+                                        when (label) {
+                                            "Privacy & Terms" -> showDisclaimer = true
+                                            "Open Source Licenses" -> showLicenses = true
+                                        }
+                                    }.padding(horizontal = 16.dp, vertical = 13.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(label, modifier = Modifier.weight(1f),
                                     style = MaterialTheme.typography.titleMedium,
                                     color = colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
-                                if (value != null) {
+                                if (value != null && value != "disclaimer") {
                                     Text(value, style = MaterialTheme.typography.bodyMedium,
                                         color = colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
                                 } else {
@@ -353,6 +400,54 @@ fun ProfileScreen(
                                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp),
                                     color = colorScheme.surfaceVariant)
                             }
+                        }
+                        // Disclaimer dialog
+                        if (showDisclaimer) {
+                            AlertDialog(
+                                onDismissRequest = { showDisclaimer = false },
+                                title = { Text("Privacy Policy & Terms of Service", fontWeight = FontWeight.Bold) },
+                                text = {
+                                    Column {
+                                        Text("By using Aurora, you agree to the following terms:", fontWeight = FontWeight.Medium)
+                                        Spacer(Modifier.height(8.dp))
+                                        Text("1. This application is provided \"as is\" without warranties of any kind.", fontSize = 14.sp)
+                                        Text("2. The developers are not responsible for any content generated by AI models.", fontSize = 14.sp)
+                                        Text("3. Users are solely responsible for the API keys they configure and the data they transmit.", fontSize = 14.sp)
+                                        Text("4. This app does not collect personal data. All data is stored locally on your device.", fontSize = 14.sp)
+                                        Text("5. AI-generated content may be inaccurate or offensive. Use at your own discretion.", fontSize = 14.sp)
+                                        Spacer(Modifier.height(8.dp))
+                                        Text("If you do not agree with these terms, please discontinue use of the application.", fontSize = 12.sp, color = colorScheme.onSurfaceVariant)
+                                    }
+                                },
+                                confirmButton = {
+                                    TextButton(onClick = { showDisclaimer = false }) {
+                                        Text("OK", fontWeight = FontWeight.Bold)
+                                    }
+                                },
+                            )
+                        }
+                        // Open Source Licenses dialog
+                        if (showLicenses) {
+                            AlertDialog(
+                                onDismissRequest = { showLicenses = false },
+                                title = { Text("Open Source Licenses", fontWeight = FontWeight.Bold) },
+                                text = {
+                                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                                        ossItem("OkHttp", "4.12.0", "Apache 2.0", "https://square.github.io/okhttp/")
+                                        ossItem("JSON-java", "20231013", "JSON License", "https://github.com/stleary/JSON-java")
+                                        ossItem("Jetpack Compose", "BOM 2024.12.01", "Apache 2.0", "https://developer.android.com/jetpack/compose")
+                                        ossItem("Navigation Compose", "2.8.5", "Apache 2.0", "https://developer.android.com/jetpack/compose/navigation")
+                                        ossItem("Material Icons Extended", "—", "Apache 2.0", "https://developer.android.com/reference/kotlin/androidx/compose/material/icons/Icons")
+                                        ossItem("marked.js", "12.0.2", "MIT", "https://github.com/markedjs/marked")
+                                        ossItem("KaTeX", "0.16.11", "MIT", "https://katex.org")
+                                    }
+                                },
+                                confirmButton = {
+                                    TextButton(onClick = { showLicenses = false }) {
+                                        Text("OK", fontWeight = FontWeight.Bold)
+                                    }
+                                },
+                            )
                         }
                     }
                 }
@@ -414,6 +509,7 @@ private fun AddApiKeySheet(
     var showKey by remember { mutableStateOf(false) }
     var customName by remember { mutableStateOf("") }
     var customUrl by remember { mutableStateOf("") }
+    var customProtocol by remember { mutableStateOf("openai") }
     var testing by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<String?>(null) }
     var testSuccess by remember { mutableStateOf(false) }
@@ -482,6 +578,28 @@ private fun AddApiKeySheet(
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                 )
+                Spacer(Modifier.height(12.dp))
+                // Protocol selector (only for custom providers)
+                Text("Protocol", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                    color = colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    listOf("openai" to "OpenAI Compatible", "anthropic" to "Anthropic").forEach { (proto, label) ->
+                        val isSelected = customProtocol == proto
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isSelected) accentColor.copy(alpha = 0.15f) else colorScheme.surfaceVariant)
+                                .clickable { customProtocol = proto }
+                                .padding(horizontal = 8.dp, vertical = 10.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(label, fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) accentColor else colorScheme.onSurfaceVariant, maxLines = 1)
+                        }
+                    }
+                }
                 Spacer(Modifier.height(12.dp))
             } else {
                 Text("Endpoint: ${selectedProvider.baseUrl}", fontSize = 11.sp,
@@ -609,6 +727,11 @@ private fun AddApiKeySheet(
                     val name = if (selectedProvider.id == "custom") customName else selectedProvider.name
                     val url = if (selectedProvider.id == "custom") customUrl else selectedProvider.baseUrl
                     if (apiKey.isNotBlank() && name.isNotBlank() && url.isNotBlank()) {
+                        val proto = when (selectedProvider.id) {
+                            "anthropic" -> "anthropic"
+                            "custom" -> customProtocol
+                            else -> "openai"
+                        }
                         onAdd(ApiConfig(
                             id = "${selectedProvider.id}_${System.currentTimeMillis()}",
                             name = name.trim(),
@@ -616,6 +739,7 @@ private fun AddApiKeySheet(
                             baseUrl = url.trim(),
                             models = fetchedModels,
                             enabled = true,
+                            protocol = proto,
                         ))
                     }
                 },
@@ -630,6 +754,18 @@ private fun AddApiKeySheet(
                 Text("Add API Key", fontWeight = FontWeight.Bold, color = Color.White)
             }
         }
+    }
+}
+
+// ─── Open Source Item ──────────────────────────────────────────
+
+@Composable
+private fun ossItem(name: String, version: String, license: String, url: String) {
+    val colorScheme = MaterialTheme.colorScheme
+    Column(modifier = Modifier.padding(vertical = 6.dp)) {
+        Text(name, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = colorScheme.onSurface)
+        Text("v$version  ·  $license", fontSize = 11.sp, color = colorScheme.onSurfaceVariant)
+        Text(url, fontSize = 10.sp, color = colorScheme.primary.copy(alpha = 0.7f))
     }
 }
 

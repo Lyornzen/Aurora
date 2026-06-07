@@ -76,7 +76,11 @@ fun HistoryScreen(
     var search by remember { mutableStateOf("") }
 
     // Get conversations from store
-    val storedConversations = ConversationStore.conversations.sortedByDescending { it.timestamp }
+    // Pinned conversations first, then sorted by time (newest first)
+    val storedConversations = ConversationStore.conversations.sortedWith(
+        compareByDescending<ConversationHistory> { it.timestamp < 0 } // pinned first
+            .thenByDescending { kotlin.math.abs(it.timestamp) }
+    )
     val conversations = storedConversations.map { conv ->
         val timeDiff = System.currentTimeMillis() - kotlin.math.abs(conv.timestamp)
         val daysDiff = timeDiff / (1000 * 60 * 60 * 24)
