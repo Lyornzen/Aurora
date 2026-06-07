@@ -44,6 +44,7 @@ import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -58,6 +59,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -72,6 +74,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -108,7 +112,10 @@ private val SUGGESTIONS = listOf("Write Code", "Translate", "Summarize PDF", "Cr
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(modifier: Modifier = Modifier) {
+fun ChatScreen(
+    modifier: Modifier = Modifier,
+    scrollToTopTrigger: Int = 0,
+) {
     val messages = ChatSession.messages
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -142,6 +149,14 @@ fun ChatScreen(modifier: Modifier = Modifier) {
     var showModelSheet by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
+    // Whether user has scrolled away from the bottom
+    val isNotAtBottom by remember {
+        derivedStateOf {
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()
+            lastVisible != null && lastVisible.index < messages.size - 1
+        }
+    }
+
     val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
     val greeting = when {
         hour < 12 -> stringResource(R.string.chat_good_morning)
@@ -161,6 +176,13 @@ fun ChatScreen(modifier: Modifier = Modifier) {
         if (!loading && messages.isNotEmpty()) {
             kotlinx.coroutines.delay(600)
             listState.scrollToItem(messages.size - 1)
+        }
+    }
+
+    // Scroll to top when triggered by double-tap on Chat tab
+    LaunchedEffect(scrollToTopTrigger) {
+        if (scrollToTopTrigger > 0) {
+            listState.scrollToItem(0)
         }
     }
 
@@ -313,6 +335,25 @@ fun ChatScreen(modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+
+        // Scroll-to-bottom FAB — visible when user scrolls away from latest message
+        if (isNotAtBottom && messages.size > 2) {
+            FloatingActionButton(
+                onClick = {
+                    kotlinx.coroutines.MainScope().launch {
+                        listState.scrollToItem(messages.size - 1)
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 80.dp),
+                containerColor = colorScheme.primaryContainer,
+                contentColor = colorScheme.primary,
+                shape = CircleShape,
+            ) {
+                Icon(Icons.Rounded.KeyboardArrowDown, "Scroll to bottom")
+            }
+        }
     }
 
     if (showModelSheet) {
@@ -336,10 +377,8 @@ fun ChatScreen(modifier: Modifier = Modifier) {
                             .clip(RoundedCornerShape(16.dp))
                             .background(if (isSelected) colorScheme.primaryContainer else Color.Transparent)
                             .clickable {
-                                if (isConfigured) {
-                                    selectedModel = m
-                                    showModelSheet = false
-                                }
+                                selectedModel = m
+                                showModelSheet = false
                             }
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -355,9 +394,20 @@ fun ChatScreen(modifier: Modifier = Modifier) {
                         }
                         Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(m.name, style = MaterialTheme.typography.titleMedium,
+                            Text(
+                                buildAnnotatedString {
+                                    append(m.name)
+                                    if (!isConfigured) {
+                                        append(" ")
+                                        withStyle(SpanStyle(fontSize = 9.sp, color = colorScheme.error)) {
+                                            append("(no key)")
+                                        }
+                                    }
+                                },
+                                style = MaterialTheme.typography.titleMedium,
                                 color = if (isConfigured) colorScheme.primary else colorScheme.onSurfaceVariant,
-                                fontWeight = FontWeight.SemiBold)
+                                fontWeight = FontWeight.SemiBold,
+                            )
                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 if (m.tags.isNotEmpty()) {
                                     m.tags.forEach { tag ->
