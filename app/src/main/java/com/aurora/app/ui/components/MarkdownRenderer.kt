@@ -7,11 +7,12 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -21,23 +22,44 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 
 /**
- * WebView + KaTeX Markdown 渲染器。
- * 使用 Base64 编码安全传递内容，动态测量内容高度避免截断。
+ * WebView + KaTeX Markdown renderer.
+ * Uses Base64 encoding for safe content transfer and dynamic height measurement.
+ * mark.html handles incomplete markdown syntax during streaming (escapes unpaired delimiters).
+ * When isStreaming transitions from true→false, calls finalizeRender() for a clean re-parse.
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun MarkdownRenderer(
     content: String,
-    isDarkTheme: Boolean = isSystemInDarkTheme(),
     modifier: Modifier = Modifier,
+    isDarkTheme: Boolean = isSystemInDarkTheme(),
+    isStreaming: Boolean = false,
 ) {
     val density = LocalDensity.current
     var measuredPx by remember { mutableIntStateOf(0) }
     val currentIsDark by rememberUpdatedState(isDarkTheme)
 
-    // Base64 编码：避免手动转义带来的注入和截断风险
+    // Base64 encode
     val encoded = remember(content) {
-        Base64.encodeToString(content.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+        if (content.isBlank()) ""
+        else Base64.encodeToString(content.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+    }
+
+    // Skip rendering for empty content
+    if (content.isBlank()) return
+
+    // Track WebView reference for finalizeRender
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+
+    // When streaming ends, do a clean re-parse (no incomplete-markdown escaping)
+    LaunchedEffect(isStreaming) {
+        if (!isStreaming && content.isNotBlank()) {
+            kotlinx.coroutines.delay(100) // small delay to ensure last content is rendered
+            val dark = if (currentIsDark) "true" else "false"
+            try {
+                webViewRef?.evaluateJavascript("finalizeRender($dark);", null)
+            } catch (_: Exception) {}
+        }
     }
 
     AndroidView(
@@ -53,7 +75,6 @@ fun MarkdownRenderer(
                 addJavascriptInterface(object {
                     @JavascriptInterface
                     fun onHeight(px: Int) {
-                        // 只接受更大的高度值，避免被早期测量覆盖
                         if (px > measuredPx) {
                             measuredPx = px
                         }
@@ -62,25 +83,33 @@ fun MarkdownRenderer(
 
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, url: String?) {
-                        val dark = if (currentIsDark) "true" else "false"
-                        view?.evaluateJavascript("initRender('$encoded',$dark);", null)
+                        if (encoded.isNotEmpty()) {
+                            val dark = if (currentIsDark) "true" else "false"
+                            try {
+                                view?.evaluateJavascript("initRender('$encoded',$dark);", null)
+                            } catch (_: Exception) {}
+                        }
                     }
                 }
 
                 loadUrl("file:///android_asset/mark.html")
+                webViewRef = this
             }
         },
         update = { view ->
-            val dark = if (isDarkTheme) "true" else "false"
-            // 重置高度，利用 heightIn(min=48.dp) 避免缩到零
-            measuredPx = 0
-            view.evaluateJavascript("initRender('$encoded',$dark);", null)
+            webViewRef = view
+            if (encoded.isNotEmpty()) {
+                val dark = if (isDarkTheme) "true" else "false"
+                measuredPx = 0
+                try {
+                    view.evaluateJavascript("initRender('$encoded',$dark);", null)
+                } catch (_: Exception) {}
+            }
         },
         modifier = modifier
             .fillMaxWidth()
             .then(
                 if (measuredPx > 0)
-                    // heightIn(min=) 允许内容超出测量值，避免固定高度裁剪
                     with(density) { Modifier.heightIn(min = measuredPx.toDp()) }
                 else
                     Modifier.heightIn(min = 48.dp)

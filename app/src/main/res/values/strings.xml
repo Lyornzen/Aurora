@@ -10,6 +10,7 @@
     <string name="history_search">Search conversations…</string>
     <string name="history_empty">No conversations yet</string>
     <string name="history_empty_hint">Start a chat to see history here</string>
+    <string name="history_count">%d conversations</string>
     <string name="history_no_results">No results found</string>
     <string name="tasks_title">Tasks</string>
     <string name="links_title">Links</string>
@@ -38,10 +39,9 @@
     <string name="profile_theme">Theme</string>
     <string name="profile_dark_mode">Dark Mode</string>
     <string name="profile_dark_mode_hint">Switch color scheme</string>
-    <string name="profile_accent_color">Accent Color</string>
     <string name="profile_language">Language</string>
     <string name="profile_about">About</string>
-    <string name="profile_version">Aurora 2.1.0</string>
+    <string name="profile_version">Aurora 1.3.0</string>
     <string name="profile_sign_out">Sign Out</string>
     <string name="add_api_title">Add API Key</string>
     <string name="add_api_provider">Provider</string>
@@ -50,19 +50,93 @@
     <string name="add_api_test">Test Connection</string>
     <string name="add_api_testing">Testing…</string>
     <string name="add_api_add">Add API Key</string>
+    <string name="add_api_system_prompt">System Prompt (optional)</string>
+    <string name="add_api_system_prompt_hint">You are a helpful assistant…</string>
     <string name="rename_title">Rename Conversation</string>
     <string name="delete_title">Delete Conversation</string>
     <string name="delete_message">This will permanently delete this conversation. This action cannot be undone.</string>
+    <string name="delete_all_title">Delete All Conversations</string>
+    <string name="delete_all_message">This will permanently delete all conversations. This action cannot be undone.</string>
     <string name="btn_ok">OK</string>
     <string name="btn_cancel">Cancel</string>
     <string name="btn_delete">Delete</string>
     <string name="menu_pin">Pin</string>
     <string name="menu_unpin">Unpin</string>
     <string name="menu_rename">Rename</string>
+    <string name="menu_export">Export</string>
+    <string name="menu_edit">Edit</string>
+    <string name="menu_branch">Branch from here</string>
+
+    <!-- Search -->
+    <string name="search_placeholder">Search messages…</string>
+    <string name="search_matches">%1$d/%2$d</string>
+    <string name="search_close">Close search</string>
+
+    <!-- Voice -->
+    <string name="voice_listening">Listening…</string>
+    <string name="voice_error">Voice recognition error</string>
+    <string name="voice_no_result">No speech detected</string>
+
+    <!-- File -->
+    <string name="file_attached">📎 %s</string>
+    <string name="file_too_large">File too large (max 10MB)</string>
+
+    <!-- Branch -->
+    <string name="branch_created">Branch created</string>
+    <string name="branch_restore">Restore</string>
+    <string name="branch_active">Branched</string>
+
+    <!-- Token -->
+    <string name="token_usage">%s tokens · %s</string>
     <string name="label_active">Active</string>
     <string name="label_pinned">Pinned</string>
     <string name="label_copy">Copy</string>
     <string name="label_share">Share</string>
     <string name="label_more">More</string>
     <string name="label_retry">Retry</string>
+
+    <!-- Welcome dialog -->
+    <string name="welcome_title">Welcome to Aurora</string>
+    <string name="welcome_hint">Enter your nickname to get started:</string>
+    <string name="welcome_name_placeholder">Your name</string>
+
+    <!-- Links screen -->
+    <string name="links_open_terminal">Open Terminal</string>
+    <string name="links_browse_files">Browse Files</string>
+    <string name="links_force_sync">Force Sync</string>
+    <string name="links_remote_view">Remote View</string>
+    <string name="links_connected_count">%1$d of %2$d devices connected</string>
+    <string name="links_device_online">%1$d device%2$s on local network</string>
+
+    <!-- Tasks screen -->
+    <string name="tasks_new">New Task</string>
+    <string name="tasks_new_hint">Configure a new automation or API task</string>
+    <string name="tasks_name_label">Task name</string>
+    <string name="tasks_desc_label">Description (optional)</string>
+    <string name="tasks_create">Create Task</string>
+    <string name="tasks_status_running">Running</string>
+    <string name="tasks_status_done">Done</string>
+    <string name="tasks_status_failed">Failed</string>
+    <string name="tasks_status_paused">Paused</string>
+    <string name="tasks_updated">Updated %s</string>
+    <string name="tasks_running_count">%d running · </string>
+    <string name="tasks_total_count">%d total</string>
+
+    <!-- Profile screen -->
+    <string name="profile_app_version">App Version</string>
+    <string name="profile_privacy_terms">Privacy &amp; Terms</string>
+    <string name="profile_licenses">Open Source Licenses</string>
+    <string name="profile_feedback">Send Feedback</string>
+    <string name="profile_api_keys_count">%d API Keys</string>
+    <string name="profile_endpoint">Endpoint: %s</string>
+    <string name="profile_protocol">Protocol</string>
+    <string name="profile_provider_name">Provider Name</string>
+    <string name="profile_base_url">Base URL</string>
+    <string name="profile_no_models_text">No models</string>
+    <string name="profile_inactive">Inactive</string>
+    <string name="profile_show">Show</string>
+    <string name="profile_hide">Hide</string>
+    <string name="profile_connected_found">Connected! %d models found</string>
+    <string name="profile_connection_failed">Failed: %s</string>
+    <string name="profile_models_label">Models:</string>
 </resources>

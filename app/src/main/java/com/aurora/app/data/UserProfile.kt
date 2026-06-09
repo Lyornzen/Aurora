@@ -23,7 +23,9 @@ object UserProfile {
 
     fun setNickname(name: String) {
         nickname = name.trim()
-        prefs?.edit()?.putString(KEY_NICKNAME, nickname)?.apply()
-        prefs?.edit()?.putBoolean(KEY_FIRST_LAUNCH, false)?.apply()
+        prefs?.edit()
+            ?.putString(KEY_NICKNAME, nickname)
+            ?.putBoolean(KEY_FIRST_LAUNCH, false)
+            ?.apply()
     }
 }

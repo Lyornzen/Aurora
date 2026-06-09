@@ -23,6 +23,8 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Share
+import android.content.Intent
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material3.AlertDialog
@@ -51,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.aurora.app.R
 import com.aurora.app.ui.theme.Warning
@@ -73,7 +76,9 @@ fun HistoryScreen(
     onLoadConversation: (id: String, model: String) -> Unit = { _, _ -> },
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val context = LocalContext.current
     var search by remember { mutableStateOf("") }
+    var showDeleteAllDialog by remember { mutableStateOf(false) }
 
     // Get conversations from store
     // Pinned conversations first, then sorted by time (newest first)
@@ -124,11 +129,24 @@ fun HistoryScreen(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item {
-            Text(stringResource(R.string.history_title), style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold, color = colorScheme.onSurface)
-            Text("${conversations.size} ${stringResource(R.string.history_title)}",
-                style = MaterialTheme.typography.bodyMedium, color = colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text(stringResource(R.string.history_title), style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold, color = colorScheme.onSurface)
+                    Text(stringResource(R.string.history_count, conversations.size),
+                        style = MaterialTheme.typography.bodyMedium, color = colorScheme.onSurfaceVariant)
+                }
+                if (conversations.isNotEmpty()) {
+                    IconButton(onClick = { showDeleteAllDialog = true }, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.Outlined.Delete, null, tint = colorScheme.error, modifier = Modifier.size(22.dp))
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
         }
         item {
             OutlinedTextField(
@@ -198,6 +216,28 @@ fun HistoryScreen(
             }
         }
     }
+
+    // Delete all confirmation dialog
+    if (showDeleteAllDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteAllDialog = false },
+            title = { Text(stringResource(R.string.delete_all_title), fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(R.string.delete_all_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    ConversationStore.clear()
+                    showDeleteAllDialog = false
+                }) {
+                    Text(stringResource(R.string.btn_delete), color = colorScheme.error, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteAllDialog = false }) {
+                    Text(stringResource(R.string.btn_cancel))
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -210,6 +250,7 @@ private fun ConversationCard(
     var showRenameDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var renameText by remember { mutableStateOf(conv.title) }
+    val context = LocalContext.current
 
     Card(
         modifier = Modifier.fillMaxWidth().clickable {
@@ -271,6 +312,23 @@ private fun ConversationCard(
                                     },
                                     leadingIcon = {
                                         Icon(Icons.Outlined.Edit, null)
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.menu_export)) },
+                                    onClick = {
+                                        val markdown = ConversationStore.exportConversation(conv.id)
+                                        val sendIntent = Intent().apply {
+                                            action = Intent.ACTION_SEND
+                                            putExtra(Intent.EXTRA_TEXT, markdown)
+                                            putExtra(Intent.EXTRA_TITLE, conv.title)
+                                            type = "text/markdown"
+                                        }
+                                        context.startActivity(Intent.createChooser(sendIntent, null))
+                                        showMenu = false
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Outlined.Share, null)
                                     },
                                 )
                                 DropdownMenuItem(

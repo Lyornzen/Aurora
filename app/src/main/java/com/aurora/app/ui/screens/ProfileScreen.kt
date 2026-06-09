@@ -1,6 +1,13 @@
 package com.aurora.app.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,7 +25,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.DarkMode
@@ -60,13 +69,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aurora.app.BuildConfig
+import com.aurora.app.R
 import com.aurora.app.data.ApiConfig
 import com.aurora.app.data.ApiService
 import com.aurora.app.data.UserProfile
@@ -99,6 +112,7 @@ fun ProfileScreen(
     onDarkModeChange: (Boolean) -> Unit = {},
 ) {
     var showAddApiSheet by remember { mutableStateOf(false) }
+    val configVersion = ApiService.configVersion
     var apiConfigs by remember { mutableStateOf(ApiService.getConfigs()) }
     val scope = rememberCoroutineScope()
     val colorScheme = MaterialTheme.colorScheme
@@ -107,17 +121,9 @@ fun ProfileScreen(
     val profileInitials = if (UserProfile.nickname.isNotBlank())
         UserProfile.nickname.take(2).uppercase() else "AU"
 
-    // Refresh configs periodically
-    var refreshTick by remember { mutableStateOf(0) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            kotlinx.coroutines.delay(5000)
-            val fresh = ApiService.getConfigs()
-            if (fresh != apiConfigs) {
-                apiConfigs = fresh
-                refreshTick++
-            }
-        }
+    // Refresh configs when ApiService notifies a change
+    LaunchedEffect(configVersion) {
+        apiConfigs = ApiService.getConfigs()
     }
 
     LazyColumn(
@@ -150,7 +156,7 @@ fun ProfileScreen(
                                 Box(modifier = Modifier.clip(RoundedCornerShape(6.dp))
                                     .background(accentColor.copy(alpha = 0.15f))
                                     .padding(horizontal = 10.dp, vertical = 3.dp)) {
-                                    Text("${apiConfigs.size} API Keys", fontSize = 11.sp,
+                                    Text(stringResource(R.string.profile_api_keys_count, apiConfigs.size), fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold, color = accentColor)
                                 }
                             }
@@ -161,9 +167,9 @@ fun ProfileScreen(
         }
 
         // ── Model Management ──
-        item { SectionLabel("Active Models", Icons.Rounded.AutoAwesome, accentColor, colorScheme) }
+        item { SectionLabel(stringResource(R.string.profile_active_models).uppercase(), Icons.Rounded.AutoAwesome, accentColor, colorScheme) }
         item {
-            androidx.compose.runtime.key(refreshTick) {
+            androidx.compose.runtime.key(configVersion) {
                 val configsForModels = ApiService.getConfigs().filter { it.enabled }
                 Column {
                     configsForModels.forEach { config ->
@@ -179,61 +185,61 @@ fun ProfileScreen(
                                 Text(config.name, fontSize = 11.sp, fontWeight = FontWeight.Bold,
                                     color = accentColor, modifier = Modifier.padding(bottom = 8.dp))
                                 if (allConfigModels.isEmpty()) {
-                                    Text("No models", fontSize = 12.sp, color = colorScheme.onSurfaceVariant)
+                                    Text(stringResource(R.string.profile_no_models_text), fontSize = 12.sp, color = colorScheme.onSurfaceVariant)
                                 } else {
                                     allConfigModels.forEachIndexed { i, modelId ->
                                         val isDisabled = modelId in config.disabledModels
                                         val alpha = if (isDisabled) 0.4f else 1f
                                         Row(verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.padding(vertical = 4.dp)) {
-                                            Box(
-                                                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp))
-                                                    .background(if (isDisabled) colorScheme.surfaceVariant else accentColor.copy(alpha = 0.12f))
-                                                    .clickable {
-                                                        ApiService.toggleModelDisabled(config.id, modelId, !isDisabled)
-                                                        refreshTick++
-                                                    },
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    if (isDisabled) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                                                    contentDescription = if (isDisabled) "Show" else "Hide",
-                                                    tint = if (isDisabled) colorScheme.onSurfaceVariant else accentColor,
-                                                    modifier = Modifier.size(20.dp))
+                                            modifier = Modifier.padding(vertical = 4.dp)
+                                                .animateContentSize()) {
+                                                Box(
+                                                    modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp))
+                                                        .background(if (isDisabled) colorScheme.surfaceVariant else accentColor.copy(alpha = 0.12f))
+                                                        .clickable {
+                                                            ApiService.toggleModelDisabled(config.id, modelId, !isDisabled)
+                                                        },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        if (isDisabled) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                                        contentDescription = if (isDisabled) stringResource(R.string.profile_show) else stringResource(R.string.profile_hide),
+                                                        tint = if (isDisabled) colorScheme.onSurfaceVariant else accentColor,
+                                                        modifier = Modifier.size(20.dp))
+                                                }
+                                                Spacer(Modifier.width(4.dp))
+                                                Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(9.dp))
+                                                    .background(accentColor.copy(alpha = 0.12f * alpha)),
+                                                    contentAlignment = Alignment.Center) {
+                                                    Icon(Icons.Rounded.AutoAwesome, null, tint = accentColor.copy(alpha = alpha),
+                                                        modifier = Modifier.size(16.dp))
+                                                }
+                                                Spacer(Modifier.width(8.dp))
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(modelId, fontSize = 13.sp,
+                                                        color = colorScheme.onSurface.copy(alpha = alpha),
+                                                        fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                                    Text(if (isDisabled) stringResource(R.string.profile_inactive) else stringResource(R.string.label_active), fontSize = 10.sp,
+                                                        color = if (isDisabled) colorScheme.onSurfaceVariant.copy(alpha = 0.4f) else accentColor,
+                                                        fontWeight = FontWeight.Medium)
+                                                }
+                                                if (i > 0) IconButton(onClick = {
+                                                    val reordered = allConfigModels.toMutableList()
+                                                    reordered.removeAt(i); reordered.add(i - 1, modelId)
+                                                    ApiService.reorderModels(config.id, reordered)
+                                                }, modifier = Modifier.size(28.dp)) {
+                                                    Icon(Icons.Rounded.KeyboardArrowUp, null,
+                                                        tint = colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                                                }
+                                                if (i < allConfigModels.size - 1) IconButton(onClick = {
+                                                    val reordered = allConfigModels.toMutableList()
+                                                    reordered.removeAt(i); reordered.add(i + 1, modelId)
+                                                    ApiService.reorderModels(config.id, reordered)
+                                                }, modifier = Modifier.size(28.dp)) {
+                                                    Icon(Icons.Rounded.KeyboardArrowDown, null,
+                                                        tint = colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                                                }
                                             }
-                                            Spacer(Modifier.width(4.dp))
-                                            Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(9.dp))
-                                                .background(accentColor.copy(alpha = 0.12f * alpha)),
-                                                contentAlignment = Alignment.Center) {
-                                                Icon(Icons.Rounded.AutoAwesome, null, tint = accentColor.copy(alpha = alpha),
-                                                    modifier = Modifier.size(16.dp))
-                                            }
-                                            Spacer(Modifier.width(8.dp))
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(modelId, fontSize = 13.sp,
-                                                    color = colorScheme.onSurface.copy(alpha = alpha),
-                                                    fontWeight = FontWeight.SemiBold, maxLines = 1)
-                                                Text(if (isDisabled) "Inactive" else "Active", fontSize = 10.sp,
-                                                    color = if (isDisabled) colorScheme.onSurfaceVariant.copy(alpha = 0.4f) else accentColor,
-                                                    fontWeight = FontWeight.Medium)
-                                            }
-                                            if (i > 0) IconButton(onClick = {
-                                                val reordered = allConfigModels.toMutableList()
-                                                reordered.removeAt(i); reordered.add(i - 1, modelId)
-                                                ApiService.reorderModels(config.id, reordered); refreshTick++
-                                            }, modifier = Modifier.size(28.dp)) {
-                                                Icon(Icons.Rounded.KeyboardArrowUp, null,
-                                                    tint = colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-                                            }
-                                            if (i < allConfigModels.size - 1) IconButton(onClick = {
-                                                val reordered = allConfigModels.toMutableList()
-                                                reordered.removeAt(i); reordered.add(i + 1, modelId)
-                                                ApiService.reorderModels(config.id, reordered); refreshTick++
-                                            }, modifier = Modifier.size(28.dp)) {
-                                                Icon(Icons.Rounded.KeyboardArrowDown, null,
-                                                    tint = colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-                                            }
-                                        }
                                         if (i < allConfigModels.size - 1)
                                             HorizontalDivider(color = colorScheme.surfaceVariant.copy(alpha = 0.5f))
                                     }
@@ -246,7 +252,7 @@ fun ProfileScreen(
         }
 
         // ── API Keys ──
-        item { SectionLabel("API Keys", Icons.Rounded.Api, accentColor, colorScheme) }
+        item { SectionLabel(stringResource(R.string.profile_api_keys).uppercase(), Icons.Rounded.Api, accentColor, colorScheme) }
         item {
             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Card(
@@ -271,7 +277,7 @@ fun ProfileScreen(
                                     Text(config.apiKey.take(8) + "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022",
                                         fontSize = 11.sp, color = colorScheme.onSurfaceVariant, maxLines = 1)
                                     if (config.models.isNotEmpty()) {
-                                        Text("${config.models.size} models available", fontSize = 10.sp,
+                                        Text(stringResource(R.string.profile_models_available, config.models.size), fontSize = 10.sp,
                                             color = accentColor)
                                     }
                                 }
@@ -279,8 +285,6 @@ fun ProfileScreen(
                                     checked = config.enabled,
                                     onCheckedChange = {
                                         ApiService.addConfig(config.copy(enabled = it))
-                                        apiConfigs = ApiService.getConfigs()
-                                        refreshTick++
                                     },
                                     colors = SwitchDefaults.colors(
                                         checkedThumbColor = accentColor,
@@ -291,8 +295,6 @@ fun ProfileScreen(
                                 )
                                 IconButton(onClick = {
                                     ApiService.removeConfig(config.id)
-                                    apiConfigs = ApiService.getConfigs()
-                                    refreshTick++
                                 }) {
                                     Icon(Icons.Outlined.Delete, null,
                                         tint = colorScheme.error,
@@ -308,7 +310,7 @@ fun ProfileScreen(
                             .fillMaxWidth()
                             .clickable { showAddApiSheet = true }
                             .padding(horizontal = 16.dp, vertical = 12.dp)) {
-                            Text("+ Add API Key", fontSize = 13.sp, color = accentColor,
+                            Text(stringResource(R.string.profile_add_api_key), fontSize = 13.sp, color = accentColor,
                                 fontWeight = FontWeight.SemiBold)
                         }
                     }
@@ -317,7 +319,7 @@ fun ProfileScreen(
         }
 
         // ── Theme ──
-        item { SectionLabel("Theme", Icons.Outlined.DarkMode, accentColor, colorScheme) }
+        item { SectionLabel(stringResource(R.string.profile_theme).uppercase(), Icons.Outlined.DarkMode, accentColor, colorScheme) }
         item {
             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Card(
@@ -335,9 +337,9 @@ fun ProfileScreen(
                             }
                             Spacer(Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Dark Mode", style = MaterialTheme.typography.titleMedium,
+                                Text(stringResource(R.string.profile_dark_mode), style = MaterialTheme.typography.titleMedium,
                                     color = colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
-                                Text("Switch color scheme", fontSize = 11.sp,
+                                Text(stringResource(R.string.profile_dark_mode_hint), fontSize = 11.sp,
                                     color = colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
                             }
                             Switch(
@@ -357,7 +359,7 @@ fun ProfileScreen(
         }
 
         // ── About ──
-        item { SectionLabel("About", Icons.Outlined.Info, accentColor, colorScheme) }
+        item { SectionLabel(stringResource(R.string.profile_about).uppercase(), Icons.Outlined.Info, accentColor, colorScheme) }
         item {
             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Card(
@@ -370,10 +372,10 @@ fun ProfileScreen(
                         var showDisclaimer by remember { mutableStateOf(false) }
                         var showLicenses by remember { mutableStateOf(false) }
                         listOf(
-                            "App Version" to "Aurora 1.2.0",
-                            "Privacy & Terms" to "disclaimer",
-                            "Open Source Licenses" to "licenses",
-                            "Send Feedback" to null,
+                            stringResource(R.string.profile_app_version) to "Aurora ${BuildConfig.VERSION_NAME}",
+                            stringResource(R.string.profile_privacy_terms) to "disclaimer",
+                            stringResource(R.string.profile_licenses) to "licenses",
+                            stringResource(R.string.profile_feedback) to null,
                         ).forEachIndexed { i, (label, value) ->
                             Row(
                                 modifier = Modifier.fillMaxWidth()
@@ -433,13 +435,13 @@ fun ProfileScreen(
                                 title = { Text("Open Source Licenses", fontWeight = FontWeight.Bold) },
                                 text = {
                                     Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                                        ossItem("OkHttp", "4.12.0", "Apache 2.0", "https://square.github.io/okhttp/")
-                                        ossItem("JSON-java", "20231013", "JSON License", "https://github.com/stleary/JSON-java")
-                                        ossItem("Jetpack Compose", "BOM 2024.12.01", "Apache 2.0", "https://developer.android.com/jetpack/compose")
-                                        ossItem("Navigation Compose", "2.8.5", "Apache 2.0", "https://developer.android.com/jetpack/compose/navigation")
-                                        ossItem("Material Icons Extended", "—", "Apache 2.0", "https://developer.android.com/reference/kotlin/androidx/compose/material/icons/Icons")
-                                        ossItem("marked.js", "12.0.2", "MIT", "https://github.com/markedjs/marked")
-                                        ossItem("KaTeX", "0.16.11", "MIT", "https://katex.org")
+                                        OssItem("OkHttp", "4.12.0", "Apache 2.0", "https://square.github.io/okhttp/")
+                                        OssItem("JSON-java", "20231013", "JSON License", "https://github.com/stleary/JSON-java")
+                                        OssItem("Jetpack Compose", "BOM 2024.12.01", "Apache 2.0", "https://developer.android.com/jetpack/compose")
+                                        OssItem("Navigation Compose", "2.8.5", "Apache 2.0", "https://developer.android.com/jetpack/compose/navigation")
+                                        OssItem("Material Icons Extended", "—", "Apache 2.0", "https://developer.android.com/reference/kotlin/androidx/compose/material/icons/Icons")
+                                        OssItem("marked.js", "12.0.2", "MIT", "https://github.com/markedjs/marked")
+                                        OssItem("KaTeX", "0.16.11", "MIT", "https://katex.org")
                                     }
                                 },
                                 confirmButton = {
@@ -468,7 +470,7 @@ fun ProfileScreen(
                     ),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
                 ) {
-                    Text("Sign Out", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.profile_sign_out), fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -479,14 +481,10 @@ fun ProfileScreen(
         AddApiKeySheet(
             onDismiss = {
                 showAddApiSheet = false
-                apiConfigs = ApiService.getConfigs()
-                refreshTick++
             },
             onAdd = { config ->
                 ApiService.addConfig(config)
-                apiConfigs = ApiService.getConfigs()
                 showAddApiSheet = false
-                refreshTick++
             },
             accentColor = accentColor,
             scope = scope,
@@ -504,12 +502,14 @@ private fun AddApiKeySheet(
     accentColor: Color,
     scope: kotlinx.coroutines.CoroutineScope,
 ) {
+    val context = LocalContext.current
     var selectedProvider by remember { mutableStateOf(PROVIDERS[0]) }
     var apiKey by remember { mutableStateOf("") }
     var showKey by remember { mutableStateOf(false) }
     var customName by remember { mutableStateOf("") }
     var customUrl by remember { mutableStateOf("") }
     var customProtocol by remember { mutableStateOf("openai") }
+    var systemPrompt by remember { mutableStateOf("") }
     var testing by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<String?>(null) }
     var testSuccess by remember { mutableStateOf(false) }
@@ -523,15 +523,16 @@ private fun AddApiKeySheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 32.dp),
         ) {
-            Text("Add API Key", style = MaterialTheme.typography.headlineSmall,
+            Text(stringResource(R.string.add_api_title), style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold, color = colorScheme.onSurface)
             Spacer(Modifier.height(20.dp))
 
             // Provider selection
-            Text("Provider", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+            Text(stringResource(R.string.add_api_provider), fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
                 color = colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 PROVIDERS.forEach { provider ->
@@ -563,7 +564,7 @@ private fun AddApiKeySheet(
                     value = customName,
                     onValueChange = { customName = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Provider Name") },
+                    label = { Text(stringResource(R.string.profile_provider_name)) },
                     placeholder = { Text("My API") },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
@@ -573,14 +574,14 @@ private fun AddApiKeySheet(
                     value = customUrl,
                     onValueChange = { customUrl = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Base URL") },
+                    label = { Text(stringResource(R.string.profile_base_url)) },
                     placeholder = { Text("https://api.example.com/v1") },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                 )
                 Spacer(Modifier.height(12.dp))
                 // Protocol selector (only for custom providers)
-                Text("Protocol", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                Text(stringResource(R.string.profile_protocol), fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
                     color = colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     listOf("openai" to "OpenAI Compatible", "anthropic" to "Anthropic").forEach { (proto, label) ->
@@ -602,7 +603,7 @@ private fun AddApiKeySheet(
                 }
                 Spacer(Modifier.height(12.dp))
             } else {
-                Text("Endpoint: ${selectedProvider.baseUrl}", fontSize = 11.sp,
+                Text(stringResource(R.string.profile_endpoint, selectedProvider.baseUrl), fontSize = 11.sp,
                     color = colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(12.dp))
             }
@@ -611,8 +612,8 @@ private fun AddApiKeySheet(
                 value = apiKey,
                 onValueChange = { apiKey = it; testResult = null },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("API Key") },
-                placeholder = { Text("sk-...") },
+                label = { Text(stringResource(R.string.add_api_key_label)) },
+                placeholder = { Text(stringResource(R.string.add_api_key_placeholder)) },
                 visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
                     IconButton(onClick = { showKey = !showKey }) {
@@ -623,6 +624,19 @@ private fun AddApiKeySheet(
                     }
                 },
                 singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = systemPrompt,
+                onValueChange = { systemPrompt = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.add_api_system_prompt)) },
+                placeholder = { Text(stringResource(R.string.add_api_system_prompt_hint)) },
+                minLines = 2,
+                maxLines = 4,
                 shape = RoundedCornerShape(12.dp),
             )
 
@@ -644,11 +658,11 @@ private fun AddApiKeySheet(
                                 onSuccess = { models ->
                                     testSuccess = true
                                     fetchedModels = models
-                                    testResult = "Connected! ${models.size} models found"
+                                    testResult = context.getString(R.string.profile_connected_found, models.size)
                                 },
                                 onFailure = { error ->
                                     testSuccess = false
-                                    testResult = "Failed: ${error.message}"
+                                    testResult = context.getString(R.string.profile_connection_failed, error.message ?: "Unknown")
                                 }
                             )
                         }
@@ -666,9 +680,9 @@ private fun AddApiKeySheet(
                 if (testing) {
                     CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
                     Spacer(Modifier.width(8.dp))
-                    Text("Testing...", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.add_api_testing), color = Color.White, fontWeight = FontWeight.SemiBold)
                 } else {
-                    Text("Test Connection", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.add_api_test), color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -700,7 +714,7 @@ private fun AddApiKeySheet(
                             HorizontalDivider(color = if (testSuccess) Color(0xFF386A1F).copy(alpha = 0.2f)
                                 else colorScheme.error.copy(alpha = 0.2f))
                             Spacer(Modifier.height(8.dp))
-                            Text("Models:", fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                            Text(stringResource(R.string.profile_models_label), fontSize = 11.sp, fontWeight = FontWeight.Bold,
                                 color = colorScheme.onSurfaceVariant)
                             Spacer(Modifier.height(4.dp))
                             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -740,6 +754,7 @@ private fun AddApiKeySheet(
                             models = fetchedModels,
                             enabled = true,
                             protocol = proto,
+                            systemPrompt = systemPrompt.trim(),
                         ))
                     }
                 },
@@ -751,7 +766,7 @@ private fun AddApiKeySheet(
                 ),
                 enabled = apiKey.isNotBlank() && testSuccess,
             ) {
-                Text("Add API Key", fontWeight = FontWeight.Bold, color = Color.White)
+                Text(stringResource(R.string.add_api_add), fontWeight = FontWeight.Bold, color = Color.White)
             }
         }
     }
@@ -760,7 +775,7 @@ private fun AddApiKeySheet(
 // ─── Open Source Item ──────────────────────────────────────────
 
 @Composable
-private fun ossItem(name: String, version: String, license: String, url: String) {
+private fun OssItem(name: String, version: String, license: String, url: String) {
     val colorScheme = MaterialTheme.colorScheme
     Column(modifier = Modifier.padding(vertical = 6.dp)) {
         Text(name, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = colorScheme.onSurface)
