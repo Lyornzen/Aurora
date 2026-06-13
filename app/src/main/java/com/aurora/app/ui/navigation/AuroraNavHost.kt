@@ -1,5 +1,12 @@
 package com.aurora.app.ui.navigation
 
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
@@ -25,6 +32,7 @@ import com.aurora.app.ui.screens.HistoryScreen
 import com.aurora.app.ui.screens.LinksScreen
 import com.aurora.app.ui.screens.ProfileScreen
 import com.aurora.app.ui.screens.TasksScreen
+import com.aurora.app.ui.theme.AppMotion
 
 object AuroraRoutes {
     const val CHAT = "chat"
@@ -34,11 +42,25 @@ object AuroraRoutes {
     const val PROFILE = "profile"
 }
 
+/** Tab order index — determines slide direction. */
+private val ROUTE_INDEX = mapOf(
+    AuroraRoutes.CHAT to 0,
+    AuroraRoutes.TASKS to 1,
+    AuroraRoutes.LINKS to 2,
+    AuroraRoutes.HISTORY to 3,
+    AuroraRoutes.PROFILE to 4,
+)
+
+private val SlideEasing = CubicBezierEasing(0.25f, 0.10f, 0.25f, 1.0f)
+private const val SLIDE_MS = 220
+private const val FADE_MS = 80
+
 @Composable
 fun AuroraNavHost(
     modifier: Modifier = Modifier,
     darkMode: Boolean = false,
     onDarkModeChange: (Boolean) -> Unit = {},
+    onConsumeSharedText: () -> String? = { null },
 ) {
     val navController = rememberNavController()
     var selectedTab by remember { mutableStateOf(AuroraTab.Chat) }
@@ -54,7 +76,6 @@ fun AuroraNavHost(
                 selectedTab = selectedTab,
                 onTabSelected = { tab ->
                     if (tab == AuroraTab.Chat && selectedTab == AuroraTab.Chat) {
-                        // Double-tap Chat tab → scroll to top
                         scrollToTopTrigger++
                     } else {
                         selectedTab = tab
@@ -74,8 +95,49 @@ fun AuroraNavHost(
             navController = navController,
             startDestination = AuroraRoutes.CHAT,
             modifier = Modifier.padding(innerPadding),
+            enterTransition = {
+                val fromIdx = ROUTE_INDEX[initialState.destination.route] ?: 0
+                val toIdx = ROUTE_INDEX[targetState.destination.route] ?: 0
+                val goingRight = toIdx >= fromIdx
+                slideInHorizontally(
+                    initialOffsetX = { if (goingRight) it else -it },
+                    animationSpec = tween(durationMillis = SLIDE_MS, easing = SlideEasing)
+                ) + fadeIn(tween(durationMillis = FADE_MS, easing = LinearEasing), initialAlpha = 0f)
+            },
+            exitTransition = {
+                val fromIdx = ROUTE_INDEX[initialState.destination.route] ?: 0
+                val toIdx = ROUTE_INDEX[targetState.destination.route] ?: 0
+                val goingRight = toIdx >= fromIdx
+                slideOutHorizontally(
+                    targetOffsetX = { if (goingRight) -it / 3 else it / 3 },
+                    animationSpec = tween(durationMillis = SLIDE_MS, easing = SlideEasing)
+                ) + fadeOut(tween(durationMillis = FADE_MS, easing = LinearEasing), targetAlpha = 0f)
+            },
+            popEnterTransition = {
+                val fromIdx = ROUTE_INDEX[initialState.destination.route] ?: 0
+                val toIdx = ROUTE_INDEX[targetState.destination.route] ?: 0
+                val goingRight = toIdx >= fromIdx
+                slideInHorizontally(
+                    initialOffsetX = { if (goingRight) it / 3 else -it / 3 },
+                    animationSpec = tween(durationMillis = SLIDE_MS, easing = SlideEasing)
+                ) + fadeIn(tween(durationMillis = FADE_MS, easing = LinearEasing), initialAlpha = 0f)
+            },
+            popExitTransition = {
+                val fromIdx = ROUTE_INDEX[initialState.destination.route] ?: 0
+                val toIdx = ROUTE_INDEX[targetState.destination.route] ?: 0
+                val goingRight = toIdx >= fromIdx
+                slideOutHorizontally(
+                    targetOffsetX = { if (goingRight) -it else it },
+                    animationSpec = tween(durationMillis = SLIDE_MS, easing = SlideEasing)
+                ) + fadeOut(tween(durationMillis = FADE_MS, easing = LinearEasing), targetAlpha = 0f)
+            },
         ) {
-            composable(AuroraRoutes.CHAT) { ChatScreen(scrollToTopTrigger = scrollToTopTrigger) }
+            composable(AuroraRoutes.CHAT) {
+                ChatScreen(
+                    scrollToTopTrigger = scrollToTopTrigger,
+                    onConsumeSharedText = onConsumeSharedText,
+                )
+            }
             composable(AuroraRoutes.TASKS) { TasksScreen() }
             composable(AuroraRoutes.LINKS) { LinksScreen() }
             composable(AuroraRoutes.HISTORY) {

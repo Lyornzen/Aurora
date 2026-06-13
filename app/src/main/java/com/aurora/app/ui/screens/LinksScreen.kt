@@ -61,8 +61,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aurora.app.R
 import com.aurora.app.ui.theme.Success
 import com.aurora.app.ui.theme.SuccessContainer
 
@@ -96,10 +98,10 @@ fun LinksScreen(modifier: Modifier = Modifier) {
     )
 
     val quickActions = listOf(
-        QuickAction(Icons.Outlined.Terminal, "Open Terminal", colorScheme.primaryContainer, colorScheme.primary),
-        QuickAction(Icons.Outlined.FolderOpen, "Browse Files", colorScheme.primaryContainer, colorScheme.primary),
-        QuickAction(Icons.Outlined.CloudSync, "Force Sync", colorScheme.secondaryContainer, colorScheme.secondary),
-        QuickAction(Icons.AutoMirrored.Outlined.Launch, "Remote View", colorScheme.primaryContainer, colorScheme.primary),
+        QuickAction(Icons.Outlined.Terminal, stringResource(R.string.links_open_terminal), colorScheme.primaryContainer, colorScheme.primary),
+        QuickAction(Icons.Outlined.FolderOpen, stringResource(R.string.links_browse_files), colorScheme.primaryContainer, colorScheme.primary),
+        QuickAction(Icons.Outlined.CloudSync, stringResource(R.string.links_force_sync), colorScheme.secondaryContainer, colorScheme.secondary),
+        QuickAction(Icons.AutoMirrored.Outlined.Launch, stringResource(R.string.links_remote_view), colorScheme.primaryContainer, colorScheme.primary),
     )
 
     LazyColumn(
@@ -114,8 +116,8 @@ fun LinksScreen(modifier: Modifier = Modifier) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom) {
                 Column {
-                    Text("Links", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onSurface)
-                    Text("$connectedCount of ${DEVICES.size} devices connected",
+                    Text(stringResource(R.string.links_title), style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onSurface)
+                    Text(stringResource(R.string.links_connected_count, connectedCount, DEVICES.size),
                         style = MaterialTheme.typography.bodyMedium, color = colorScheme.onSurfaceVariant)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -123,7 +125,7 @@ fun LinksScreen(modifier: Modifier = Modifier) {
                         onClick = { syncing = true },
                         modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(colorScheme.surfaceVariant),
                     ) {
-                        Icon(Icons.Outlined.Refresh, "Sync",
+                        Icon(Icons.Outlined.Refresh, null,
                             tint = colorScheme.primary, modifier = Modifier.size(20.dp)
                                 .then(if (syncing) Modifier.rotate(rotation) else Modifier))
                     }
@@ -132,7 +134,7 @@ fun LinksScreen(modifier: Modifier = Modifier) {
                         onClick = {},
                         modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(colorScheme.primary),
                     ) {
-                        Icon(Icons.Outlined.Add, "Add Device", tint = Color.White, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Outlined.Add, null, tint = Color.White, modifier = Modifier.size(20.dp))
                     }
                 }
             }
@@ -144,14 +146,14 @@ fun LinksScreen(modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(36.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isConnected) colorScheme.primaryContainer else colorScheme.primaryContainer
+                    containerColor = colorScheme.primaryContainer
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(16.dp))
-                            .background(if (isConnected) colorScheme.primary else colorScheme.primary),
+                            .background(colorScheme.primary),
                             contentAlignment = Alignment.Center) {
                             Icon(
                                 if (isConnected) Icons.Rounded.Wifi else Icons.Rounded.WifiOff,
@@ -161,15 +163,15 @@ fun LinksScreen(modifier: Modifier = Modifier) {
                         Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                if (isConnected) "Network Active" else "No Connection",
+                                if (isConnected) stringResource(R.string.links_network_active) else stringResource(R.string.links_no_connection),
                                 style = MaterialTheme.typography.titleLarge,
-                                color = if (isConnected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onPrimaryContainer,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
                             )
                             Text(
-                                if (isConnected) "$connectedCount device${if (connectedCount > 1) "s" else ""} on local network"
-                                else "Check your network settings",
+                                if (isConnected) stringResource(R.string.links_device_online, connectedCount, if (connectedCount > 1) "s" else "")
+                                else stringResource(R.string.links_check_network),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = if (isConnected) colorScheme.primary else colorScheme.primary,
+                                color = colorScheme.primary,
                             )
                         }
                         if (syncing) {
@@ -203,7 +205,7 @@ fun LinksScreen(modifier: Modifier = Modifier) {
         // Quick Actions
         item {
             Column {
-                Text("QUICK ACTIONS", fontSize = 10.sp, fontWeight = FontWeight.W600,
+                Text(stringResource(R.string.links_quick_actions), fontSize = 10.sp, fontWeight = FontWeight.W600,
                     color = colorScheme.onSurfaceVariant, letterSpacing = 0.5.sp,
                     modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -234,7 +236,7 @@ fun LinksScreen(modifier: Modifier = Modifier) {
         }
         // Devices header
         item {
-            Text("DEVICES", fontSize = 10.sp, fontWeight = FontWeight.W600,
+            Text(stringResource(R.string.links_devices), fontSize = 10.sp, fontWeight = FontWeight.W600,
                 color = colorScheme.onSurfaceVariant, letterSpacing = 0.5.sp,
                 modifier = Modifier.padding(start = 4.dp))
         }
@@ -261,10 +263,10 @@ fun LinksScreen(modifier: Modifier = Modifier) {
                     }
                     Spacer(Modifier.width(12.dp))
                     Column {
-                        Text("Add New Device", style = MaterialTheme.typography.titleMedium,
+                        Text(stringResource(R.string.links_add_device), style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.W600,
                             color = colorScheme.onSurfaceVariant)
-                        Text("Scan QR code or enter IP address",
+                        Text(stringResource(R.string.links_add_device_hint),
                             fontSize = 11.sp, color = colorScheme.outlineVariant)
                     }
                 }

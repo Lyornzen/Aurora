@@ -57,15 +57,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-// ─── Local custom colors ─────────────────────────────────────────
-
-private val Success = Color(0xFF386A1F)
-private val SuccessContainer = Color(0xFFC5EFA2)
-private val Warning = Color(0xFF7A4900)
-private val WarningContainer = Color(0xFFFFDDB3)
+import com.aurora.app.R
+import com.aurora.app.ui.theme.Success
+import com.aurora.app.ui.theme.SuccessContainer
+import com.aurora.app.ui.theme.Warning
+import com.aurora.app.ui.theme.WarningContainer
 
 // ─── Data Models ────────────────────────────────────────────────
 
@@ -120,9 +119,9 @@ fun TasksScreen(modifier: Modifier = Modifier) {
                     verticalAlignment = Alignment.Bottom,
                 ) {
                     Column {
-                        Text("Tasks", style = MaterialTheme.typography.headlineLarge, color = colorScheme.onSurface)
+                        Text(stringResource(R.string.tasks_title), style = MaterialTheme.typography.headlineLarge, color = colorScheme.onSurface)
                         Text(
-                            "${if (runningTasks.isNotEmpty()) "${runningTasks.size} running · " else ""}${TASKS.size} total",
+                            "${if (runningTasks.isNotEmpty()) stringResource(R.string.tasks_running_count, runningTasks.size) else ""}${stringResource(R.string.tasks_total_count, TASKS.size)}",
                             style = MaterialTheme.typography.bodyMedium, color = colorScheme.onSurfaceVariant,
                         )
                     }
@@ -161,7 +160,7 @@ fun TasksScreen(modifier: Modifier = Modifier) {
                                 trackColor = colorScheme.primaryContainer,
                             )
                             Spacer(Modifier.height(4.dp))
-                            Text("Updated ${task.updatedAt}", fontSize = 11.sp, color = colorScheme.primary)
+                            Text(stringResource(R.string.tasks_updated, task.updatedAt), fontSize = 11.sp, color = colorScheme.primary)
                         }
                     }
                 }
@@ -203,7 +202,7 @@ fun TasksScreen(modifier: Modifier = Modifier) {
             contentColor = Color.White,
             elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),
         ) {
-            Icon(Icons.Rounded.Add, "New Task")
+            Icon(Icons.Rounded.Add, null)
         }
     }
 
@@ -221,14 +220,14 @@ fun TasksScreen(modifier: Modifier = Modifier) {
                     Box(modifier = Modifier.width(32.dp).height(4.dp).clip(RoundedCornerShape(2.dp))
                         .background(colorScheme.outlineVariant))
                 }
-                Text("New Task", style = MaterialTheme.typography.titleLarge, color = colorScheme.onSurface)
-                Text("Configure a new automation or API task",
+                Text(stringResource(R.string.tasks_new), style = MaterialTheme.typography.titleLarge, color = colorScheme.onSurface)
+                Text(stringResource(R.string.tasks_new_hint),
                     style = MaterialTheme.typography.bodyMedium, color = colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 20.dp))
                 OutlinedTextField(
                     value = newTitle,
                     onValueChange = { newTitle = it },
-                    label = { Text("Task name") },
+                    label = { Text(stringResource(R.string.tasks_name_label)) },
                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                     shape = RoundedCornerShape(16.dp),
                 )
@@ -236,7 +235,7 @@ fun TasksScreen(modifier: Modifier = Modifier) {
                 OutlinedTextField(
                     value = "",
                     onValueChange = {},
-                    label = { Text("Description (optional)") },
+                    label = { Text(stringResource(R.string.tasks_desc_label)) },
                     modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
                     shape = RoundedCornerShape(16.dp),
                     minLines = 2,
@@ -247,14 +246,14 @@ fun TasksScreen(modifier: Modifier = Modifier) {
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(20.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = colorScheme.primary),
-                    ) { Text("Cancel") }
+                    ) { Text(stringResource(R.string.btn_cancel)) }
                     Button(
                         onClick = { showNewTask = false },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(20.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = colorScheme.primary),
                         elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
-                    ) { Text("Create Task") }
+                    ) { Text(stringResource(R.string.tasks_create)) }
                 }
             }
         }
@@ -267,10 +266,10 @@ fun TasksScreen(modifier: Modifier = Modifier) {
 private fun TaskCard(task: Task) {
     val colorScheme = MaterialTheme.colorScheme
     val statusMeta = mapOf(
-        TaskStatus.Running to StatusMeta("Running", colorScheme.primary, colorScheme.primaryContainer, null),
-        TaskStatus.Completed to StatusMeta("Done", Success, SuccessContainer, Icons.Outlined.CheckCircle),
-        TaskStatus.Failed to StatusMeta("Failed", colorScheme.error, colorScheme.errorContainer, Icons.Outlined.Error),
-        TaskStatus.Paused to StatusMeta("Paused", colorScheme.secondary, colorScheme.secondaryContainer, Icons.Outlined.PauseCircle),
+        TaskStatus.Running to StatusMeta(stringResource(R.string.tasks_status_running), colorScheme.primary, colorScheme.primaryContainer, null),
+        TaskStatus.Completed to StatusMeta(stringResource(R.string.tasks_status_done), Success, SuccessContainer, Icons.Outlined.CheckCircle),
+        TaskStatus.Failed to StatusMeta(stringResource(R.string.tasks_status_failed), colorScheme.error, colorScheme.errorContainer, Icons.Outlined.Error),
+        TaskStatus.Paused to StatusMeta(stringResource(R.string.tasks_status_paused), colorScheme.secondary, colorScheme.secondaryContainer, Icons.Outlined.PauseCircle),
     )
     val meta = statusMeta[task.status]!!
     Card(
