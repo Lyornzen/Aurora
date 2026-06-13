@@ -1,13 +1,6 @@
 package com.aurora.app.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,8 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -82,7 +73,6 @@ import com.aurora.app.BuildConfig
 import com.aurora.app.R
 import com.aurora.app.data.ApiConfig
 import com.aurora.app.data.ApiService
-import com.aurora.app.data.UserProfile
 import kotlinx.coroutines.launch
 
 // ─── Pre-configured providers ─────────────────────────────────
@@ -117,9 +107,6 @@ fun ProfileScreen(
     val scope = rememberCoroutineScope()
     val colorScheme = MaterialTheme.colorScheme
     val accentColor = colorScheme.primary
-    val profileName = UserProfile.nickname.ifEmpty { "Aurora User" }
-    val profileInitials = if (UserProfile.nickname.isNotBlank())
-        UserProfile.nickname.take(2).uppercase() else "AU"
 
     // Refresh configs when ApiService notifies a change
     LaunchedEffect(configVersion) {
@@ -131,41 +118,6 @@ fun ProfileScreen(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        // ── User hero ──
-        item {
-            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp)) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(36.dp),
-                    colors = CardDefaults.cardColors(containerColor = colorScheme.primaryContainer),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                ) {
-                    Row(modifier = Modifier.padding(24.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.size(60.dp).clip(RoundedCornerShape(20.dp)).background(accentColor),
-                            contentAlignment = Alignment.Center) {
-                            Text(profileInitials, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
-                        Spacer(Modifier.width(16.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(profileName, style = MaterialTheme.typography.titleLarge,
-                                color = colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold)
-                            Text("AI Assistant", style = MaterialTheme.typography.bodyMedium,
-                                color = accentColor, fontWeight = FontWeight.Medium)
-                            Spacer(Modifier.height(8.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Box(modifier = Modifier.clip(RoundedCornerShape(6.dp))
-                                    .background(accentColor.copy(alpha = 0.15f))
-                                    .padding(horizontal = 10.dp, vertical = 3.dp)) {
-                                    Text(stringResource(R.string.profile_api_keys_count, apiConfigs.size), fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold, color = accentColor)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         // ── Model Management ──
         item { SectionLabel(stringResource(R.string.profile_active_models).uppercase(), Icons.Rounded.AutoAwesome, accentColor, colorScheme) }
         item {
@@ -452,25 +404,6 @@ fun ProfileScreen(
                             )
                         }
                     }
-                }
-            }
-        }
-
-        // ── Sign Out ──
-        item {
-            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
-                // TODO: Implement sign-out / account management
-                Button(
-                    onClick = {},
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Transparent,
-                        contentColor = colorScheme.error,
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
-                ) {
-                    Text(stringResource(R.string.profile_sign_out), fontWeight = FontWeight.Bold)
                 }
             }
         }
