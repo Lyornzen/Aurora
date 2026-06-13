@@ -8,22 +8,12 @@ import android.net.Uri
 import android.view.HapticFeedbackConstants
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -58,13 +48,11 @@ import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.automirrored.rounded.CallSplit
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -114,7 +102,6 @@ import com.aurora.app.data.ChatSession
 import com.aurora.app.data.Message
 import com.aurora.app.data.Role
 import com.aurora.app.data.TokenUsage
-import com.aurora.app.data.UserProfile
 import com.aurora.app.ui.components.MarkdownRenderer
 import com.aurora.app.ui.components.MessageSearchBar
 import com.aurora.app.ui.components.TokenUsageBadge
@@ -137,6 +124,28 @@ private val DEFAULT_MODELS = listOf(
 )
 
 private val SUGGESTIONS = listOf("Write Code", "Translate", "Summarize PDF", "Create Task", "Explain Concept")
+
+/** Build the text content to send to the API, including any attachment. */
+private fun buildApiContent(message: Message): String {
+    val sb = StringBuilder(message.content)
+    message.attachment?.let { att ->
+        when {
+            att.mimeType.startsWith("image/") ->
+                sb.append("\n\n[Image: ${att.name}]\ndata:${att.mimeType};base64,${att.base64Data}")
+            att.mimeType.startsWith("text/") || att.mimeType.contains("json") ||
+                att.mimeType.contains("xml") || att.mimeType.contains("javascript") -> {
+                try {
+                    val text = String(android.util.Base64.decode(att.base64Data, android.util.Base64.NO_WRAP), Charsets.UTF_8)
+                    sb.append("\n\n--- File: ${att.name} ---\n$text\n---")
+                } catch (_: Exception) {
+                    sb.append("\n\n[File attached: ${att.name}]")
+                }
+            }
+            else -> sb.append("\n\n[File attached: ${att.name}]")
+        }
+    }
+    return sb.toString()
+}
 
 // ─── ChatScreen ─────────────────────────────────────────────────
 
@@ -285,10 +294,6 @@ fun ChatScreen(
 
     val noApiMessage = stringResource(R.string.chat_error_no_api)
 
-    var showWelcomeDialog by remember { mutableStateOf(UserProfile.isFirstLaunch()) }
-    var nicknameInput by remember { mutableStateOf("") }
-    val displayName = UserProfile.nickname.ifEmpty { "Alex" }
-
     // Edit message state
     var editingMessageId by remember { mutableStateOf<String?>(null) }
     var editingText by remember { mutableStateOf("") }
@@ -326,28 +331,10 @@ fun ChatScreen(
                     val config = enabledConfigs.find { it.models.contains(selectedModel.id) }
                         ?: enabledConfigs.first()
                     val chatMessages = messages.map { msg ->
-                        val contentBuilder = StringBuilder(msg.content)
-                        // Include attachment content for API
-                        msg.attachment?.let { att ->
-                            if (att.mimeType.startsWith("image/")) {
-                                // For images: append base64 data URL for multimodal APIs
-                                contentBuilder.append("\n\n[Image: ${att.name}]\ndata:${att.mimeType};base64,${att.base64Data}")
-                            } else if (att.mimeType.startsWith("text/") || att.mimeType.contains("json") || att.mimeType.contains("xml") || att.mimeType.contains("javascript")) {
-                                // For text files: decode and append content
-                                try {
-                                    val text = String(android.util.Base64.decode(att.base64Data, android.util.Base64.NO_WRAP), Charsets.UTF_8)
-                                    contentBuilder.append("\n\n--- File: ${att.name} ---\n$text\n---")
-                                } catch (_: Exception) {
-                                    contentBuilder.append("\n\n[File attached: ${att.name}]")
-                                }
-                            } else {
-                                contentBuilder.append("\n\n[File attached: ${att.name}]")
-                            }
-                        }
                         com.aurora.app.data.ChatMessage(
                             id = msg.id,
                             role = if (msg.role == Role.User) "user" else "assistant",
-                            content = contentBuilder.toString(),
+                            content = buildApiContent(msg),
                         )
                     }
 
@@ -415,25 +402,10 @@ fun ChatScreen(
                 val config = enabledConfigs.find { it.models.contains(selectedModel.id) }
                     ?: enabledConfigs.first()
                 val chatMessages = messages.map { msg ->
-                    val contentBuilder = StringBuilder(msg.content)
-                    msg.attachment?.let { att ->
-                        if (att.mimeType.startsWith("image/")) {
-                            contentBuilder.append("\n\n[Image: ${att.name}]\ndata:${att.mimeType};base64,${att.base64Data}")
-                        } else if (att.mimeType.startsWith("text/") || att.mimeType.contains("json") || att.mimeType.contains("xml") || att.mimeType.contains("javascript")) {
-                            try {
-                                val text = String(android.util.Base64.decode(att.base64Data, android.util.Base64.NO_WRAP), Charsets.UTF_8)
-                                contentBuilder.append("\n\n--- File: ${att.name} ---\n$text\n---")
-                            } catch (_: Exception) {
-                                contentBuilder.append("\n\n[File attached: ${att.name}]")
-                            }
-                        } else {
-                            contentBuilder.append("\n\n[File attached: ${att.name}]")
-                        }
-                    }
                     com.aurora.app.data.ChatMessage(
                         id = msg.id,
                         role = if (msg.role == Role.User) "user" else "assistant",
-                        content = contentBuilder.toString(),
+                        content = buildApiContent(msg),
                     )
                 }
                 val assistantMsgId = UUID.randomUUID().toString()
@@ -525,7 +497,7 @@ fun ChatScreen(
                     }
                 }
                 item {
-                    HeroCard(greeting = greeting, displayName = displayName, modelName = selectedModel.name, colorScheme = colorScheme)
+                    HeroCard(greeting = greeting, modelName = selectedModel.name, colorScheme = colorScheme)
                 }
                 item {
                     ModelSelectorCard(model = selectedModel, colorScheme = colorScheme, onClick = { showModelSheet = true })
@@ -720,39 +692,18 @@ fun ChatScreen(
         }
     }
 
-    // Welcome dialog
-    if (showWelcomeDialog) {
-        AlertDialog(
-            onDismissRequest = { if (nicknameInput.isNotBlank()) UserProfile.setNickname(nicknameInput); showWelcomeDialog = false },
-            title = { Text(stringResource(R.string.welcome_title), fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    Text(stringResource(R.string.welcome_hint), color = colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(value = nicknameInput, onValueChange = { nicknameInput = it },
-                        placeholder = { Text(stringResource(R.string.welcome_name_placeholder)) },
-                        singleLine = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { if (nicknameInput.isNotBlank()) UserProfile.setNickname(nicknameInput); showWelcomeDialog = false }) {
-                    Text(stringResource(R.string.btn_ok), fontWeight = FontWeight.Bold)
-                }
-            },
-        )
-    }
 }
 
 // ─── Sub-components ─────────────────────────────────────────────
 
 @Composable
-private fun HeroCard(greeting: String, displayName: String, modelName: String, colorScheme: androidx.compose.material3.ColorScheme) {
+private fun HeroCard(greeting: String, modelName: String, colorScheme: androidx.compose.material3.ColorScheme) {
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(36.dp),
         colors = CardDefaults.cardColors(containerColor = colorScheme.primaryContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
         Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("$greeting, $displayName", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colorScheme.primary)
+                Text(greeting, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = colorScheme.primary)
                 Spacer(Modifier.height(2.dp))
                 Text("Aurora AI", style = MaterialTheme.typography.headlineLarge, color = colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))

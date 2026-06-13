@@ -15,7 +15,6 @@ import com.aurora.app.ui.theme.AuroraTheme
 import com.aurora.app.data.ApiService
 import com.aurora.app.data.ChatSession
 import com.aurora.app.data.ConversationStore
-import com.aurora.app.data.UserProfile
 
 class MainActivity : ComponentActivity() {
 
@@ -28,7 +27,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         ConversationStore.init(this)
         ApiService.init(this)
-        UserProfile.init(this)
 
         handleShareIntent(intent)
 
